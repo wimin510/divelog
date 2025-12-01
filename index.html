@@ -13,7 +13,7 @@
         .tab-active { border-color: #10b981; color: #10b981; font-weight: 600; }
         .tab-inactive { border-color: transparent; color: #6b7280; }
         /* Style for form elements to be consistent */
-        input[type="number"], input[type="text"], input[type="date"], input[type="datetime-local"], textarea, select, input[type="email"], input[type="password"] {
+        input[type="number"], input[type="text"], input[type="date"], input[type="time"], textarea, select, input[type="email"], input[type="password"] {
             border: 1px solid #d1d5db;
             padding: 0.5rem 0.75rem;
             border-radius: 0.375rem; /* rounded-md */
@@ -44,9 +44,7 @@
     </div>
 
     <!-- 訊息彈窗 (Modal) -->
-    <!-- Modified: Added items-start and pt-10 to allow scrolling from top on small screens if needed, though center alignment usually works with max-h -->
     <div id="modal-container" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
-        <!-- Modified: Added max-h-[90vh] and overflow-y-auto to allow scrolling -->
         <div id="modal-content" class="bg-white rounded-lg shadow-2xl p-6 w-full max-w-lg transform transition-all max-h-[90vh] overflow-y-auto">
             <!-- Modal content will be dynamically updated -->
         </div>
@@ -189,6 +187,16 @@
                     
                     document.getElementById('dive-mode').addEventListener('change', this.toggleNitroxInput);
                     this.toggleNitroxInput();
+                    
+                    // Add listeners for Time Calculation (New)
+                    const dateInput = document.getElementById('date');
+                    const entryTimeInput = document.getElementById('entryTime');
+                    const exitTimeInput = document.getElementById('exitTime');
+                    
+                    if (dateInput) dateInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                    if (entryTimeInput) entryTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                    if (exitTimeInput) exitTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+
                     // Add listeners for SAC calculation
                     ['depth_m', 'avg_depth_m', 'time_min', 'air_start_bar', 'air_end_bar', 'tank_volume_l'].forEach(id => {
                         const input = document.getElementById(id);
@@ -323,15 +331,46 @@
             }
         },
         
+        // --- Time & Date Calculation Logic (UPDATED) ---
+
+        calculateDiveDuration() {
+            const dateInput = document.getElementById('date');
+            const entryInput = document.getElementById('entryTime');
+            const exitInput = document.getElementById('exitTime');
+            const durationInput = document.getElementById('time_min');
+
+            // Need date + entry time + exit time to calculate
+            if (dateInput && entryInput && exitInput && dateInput.value && entryInput.value && exitInput.value) {
+                const dateStr = dateInput.value;
+                const start = new Date(`${dateStr}T${entryInput.value}`);
+                const end = new Date(`${dateStr}T${exitInput.value}`);
+                
+                // Difference in milliseconds
+                let diffMs = end - start;
+                
+                // Handle cross-midnight dives (if exit time is smaller than entry time, assume next day)
+                if (diffMs < 0) {
+                    diffMs += 24 * 60 * 60 * 1000; // Add 24 hours
+                }
+                
+                // Convert to minutes
+                if (diffMs > 0) {
+                    const diffMins = Math.floor(diffMs / 60000);
+                    if (durationInput) {
+                        durationInput.value = diffMins;
+                        // Trigger input event manually so SAC calculation updates
+                        durationInput.dispatchEvent(new Event('input'));
+                    }
+                }
+            }
+        },
+
         // --- SAC Calculation Logic (Remains the same) ---
 
         calculateSAC(avgDepthM, timeMin, startBar, endBar, tankVolumeL) {
-            if (!avgDepthM || !timeMin || !startBar || !endBar || timeMin <= 0 || startBar <= endBar) {
+            if (!avgDepthM || !timeMin || !startBar || !endBar || !tankVolumeL || timeMin <= 0 || startBar <= endBar) {
                 return null;
             }
-
-            // tankVolumeL is optional in the formula if calculating rock bottom, but required for SAC
-            if (!tankVolumeL) return null;
 
             const pressureUsed = startBar - endBar; // bar
             const avgPressureAtm = (avgDepthM / 10) + 1; // ATA (Atmospheres Absolute)
@@ -394,8 +433,10 @@
             
             // Default values for new log or values from existing log
             const logDate = log ? log.date : new Date().toISOString().substring(0, 10);
+            // Modified: Only use HH:MM format for time inputs
             const entryTime = log ? (log.entryTime || '') : '';
             const exitTime = log ? (log.exitTime || '') : '';
+            
             const diveType = log ? (log.diveType || '岸潛') : '岸潛';
             const waveCondition = log ? (log.waveCondition || '') : '';
             const currentCondition = log ? (log.currentCondition || '') : '';
@@ -404,6 +445,12 @@
             const o2_percent = log ? log.o2_percent : '21';
             const avg_depth_m = log ? log.avg_depth_m : '';
             const tank_volume_l = log ? log.tank_volume_l : '12.0'; // Default to a standard 12L tank
+            
+            // New fields
+            const weight_kg = log ? (log.weight_kg || '') : '';
+            const buddy = log ? (log.buddy || '') : '';
+            const dive_guide = log ? (log.dive_guide || '') : '';
+            const dive_shop = log ? (log.dive_shop || '') : '';
 
             // Gear checkboxes rendering
             const gearCheckboxes = this.gearList.map(gear => {
@@ -433,20 +480,20 @@
                         </div>
                     </div>
 
-                    <!-- 1. 入水時間和出水時間 (NEW) -->
+                    <!-- 1. 入水時間和出水時間 (UPDATED: type="time") -->
                     <h3 class="text-xl font-medium text-gray-700 mt-6 pt-4 border-t">時間與類型</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="space-y-1">
                             <label for="entryTime" class="block text-sm font-medium text-gray-700">入水時間</label>
-                            <input type="datetime-local" id="entryTime" name="entryTime" required value="${entryTime}">
+                            <input type="time" id="entryTime" name="entryTime" required value="${entryTime}">
                         </div>
                         <div class="space-y-1">
                             <label for="exitTime" class="block text-sm font-medium text-gray-700">出水時間</label>
-                            <input type="datetime-local" id="exitTime" name="exitTime" required value="${exitTime}">
+                            <input type="time" id="exitTime" name="exitTime" required value="${exitTime}">
                         </div>
                     </div>
 
-                    <!-- 2. 潛水類型 (NEW) -->
+                    <!-- 2. 潛水類型 -->
                     <div class="space-y-1 mt-4">
                         <label class="block text-sm font-medium text-gray-700">潛水類型</label>
                         <div class="flex space-x-6 p-2 bg-gray-50 rounded-md">
@@ -461,7 +508,30 @@
                         </div>
                     </div>
                     
-                    <!-- 3, 4, 5. 浪況、流況、天氣 (NEW) -->
+                    <!-- 新增：團隊與後勤資訊 -->
+                    <h3 class="text-xl font-medium text-gray-700 mt-6 pt-4 border-t">團隊與後勤</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="space-y-1 relative">
+                            <label for="weight_kg" class="block text-sm font-medium text-gray-700">配重</label>
+                            <input type="number" id="weight_kg" name="weight_kg" placeholder="0.0" step="0.5" min="0" value="${weight_kg}">
+                            <span class="metric-unit">kg</span>
+                        </div>
+                        <div class="space-y-1">
+                            <label for="dive_guide" class="block text-sm font-medium text-gray-700">潛導</label>
+                            <input type="text" id="dive_guide" name="dive_guide" placeholder="導潛姓名" value="${dive_guide}">
+                        </div>
+                        <div class="space-y-1 md:col-span-2">
+                            <label for="buddy" class="block text-sm font-medium text-gray-700">潛伴</label>
+                            <input type="text" id="buddy" name="buddy" placeholder="潛伴姓名 (多位可用逗號分隔)" value="${buddy}">
+                        </div>
+                    </div>
+                    <div class="mt-4 space-y-1">
+                        <label for="dive_shop" class="block text-sm font-medium text-gray-700">潛店</label>
+                        <input type="text" id="dive_shop" name="dive_shop" placeholder="潛水中心/店家名稱" value="${dive_shop}">
+                    </div>
+
+                    
+                    <!-- 3, 4, 5. 浪況、流況、天氣 -->
                     <h3 class="text-xl font-medium text-gray-700 mt-6 pt-4 border-t">環境狀況</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div class="space-y-1">
@@ -819,6 +889,15 @@
                     const input = document.getElementById(id);
                     if(input) input.addEventListener('input', this.calculateAndDisplaySAC.bind(this));
                 });
+                
+                // Add listeners for Time Calculation (for Modal) - UPDATED
+                const dateInput = document.getElementById('date');
+                const entryTimeInput = document.getElementById('entryTime');
+                const exitTimeInput = document.getElementById('exitTime');
+                if (dateInput) dateInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                if (entryTimeInput) entryTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                if (exitTimeInput) exitTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+
                 this.toggleNitroxInput(); // Initial check for edit modal
                 this.calculateAndDisplaySAC(); // Initial SAC calculation for edit modal
             }
@@ -906,13 +985,19 @@
                 date: formData.get('date'),
                 location: formData.get('location'),
                 
-                // NEW: Time and Environment Fields
-                entryTime: formData.get('entryTime'), // Full datetime string
-                exitTime: formData.get('exitTime'),   // Full datetime string
+                // Time and Environment Fields (Updated)
+                entryTime: formData.get('entryTime'), // HH:MM
+                exitTime: formData.get('exitTime'),   // HH:MM
                 diveType: formData.get('diveType'),   // 岸潛 or 船潛
                 waveCondition: formData.get('waveCondition'), // 浪況
                 currentCondition: formData.get('currentCondition'), // 流況
                 weather: formData.get('weather'), // 天氣
+                
+                // New Fields
+                weight_kg: formData.get('weight_kg') ? parseFloat(formData.get('weight_kg')) : null,
+                buddy: formData.get('buddy'),
+                dive_guide: formData.get('dive_guide'),
+                dive_shop: formData.get('dive_shop'),
 
                 // Existing Fields
                 depth_m: parseFloat(formData.get('depth_m')),
@@ -938,6 +1023,63 @@
             this.setPage('history');
         },
         
+        // --- UPDATED: handleEditLogSubmit to capture new fields ---
+        handleEditLogSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const logId = this.currentEditingLog.id;
+
+            const gearUsed = [];
+            formData.getAll('gear_used').forEach(item => gearUsed.push(item));
+
+            const avgDepthM = parseFloat(formData.get('avg_depth_m'));
+            const timeMin = parseInt(formData.get('time_min'), 10);
+            const startBar = parseInt(formData.get('air_start_bar'), 10);
+            const endBar = parseInt(formData.get('air_end_bar'), 10);
+            const tankVolumeL = parseFloat(formData.get('tank_volume_l'));
+
+            const sacValue = this.calculateSAC(avgDepthM, timeMin, startBar, endBar, tankVolumeL);
+
+            const updatedLog = {
+                date: formData.get('date'),
+                location: formData.get('location'),
+                
+                // Time and Environment Fields (Updated)
+                entryTime: formData.get('entryTime'), // HH:MM
+                exitTime: formData.get('exitTime'),   // HH:MM
+                diveType: formData.get('diveType'),   // 岸潛 or 船潛
+                waveCondition: formData.get('waveCondition'), // 浪況
+                currentCondition: formData.get('currentCondition'), // 流況
+                weather: formData.get('weather'), // 天氣
+                
+                // New Fields
+                weight_kg: formData.get('weight_kg') ? parseFloat(formData.get('weight_kg')) : null,
+                buddy: formData.get('buddy'),
+                dive_guide: formData.get('dive_guide'),
+                dive_shop: formData.get('dive_shop'),
+
+                // Existing Fields
+                depth_m: parseFloat(formData.get('depth_m')),
+                avg_depth_m: avgDepthM,
+                time_min: timeMin,
+                tank_volume_l: tankVolumeL,
+                water_temp_c: formData.get('water_temp_c') ? parseFloat(formData.get('water_temp_c')) : null,
+                air_start_bar: startBar,
+                air_end_bar: endBar,
+                visibility_m: formData.get('visibility_m') ? parseInt(formData.get('visibility_m'), 10) : null,
+                mode: formData.get('mode'),
+                o2_percent: formData.get('mode') === 'Nitrox' ? parseInt(formData.get('o2_percent'), 10) : 21,
+                notes: formData.get('notes'),
+                gear_used: gearUsed,
+                avg_sac_l_min: sacValue,
+                updated_at: new Date().toISOString()
+            };
+
+            this.updateLog(logId, updatedLog);
+            this.closeModal();
+        },
+
         async updateLog(logId, updatedData) {
             const logsRef = this.getCollectionRef('logs');
             if (!logsRef) return;

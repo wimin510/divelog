@@ -44,8 +44,10 @@
     </div>
 
     <!-- 訊息彈窗 (Modal) -->
+    <!-- Modified: Added items-start and pt-10 to allow scrolling from top on small screens if needed, though center alignment usually works with max-h -->
     <div id="modal-container" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
-        <div id="modal-content" class="bg-white rounded-lg shadow-2xl p-6 w-full max-w-lg transform transition-all">
+        <!-- Modified: Added max-h-[90vh] and overflow-y-auto to allow scrolling -->
+        <div id="modal-content" class="bg-white rounded-lg shadow-2xl p-6 w-full max-w-lg transform transition-all max-h-[90vh] overflow-y-auto">
             <!-- Modal content will be dynamically updated -->
         </div>
     </div>
@@ -929,7 +931,6 @@
         },
         
         async updateLog(logId, updatedData) {
-            // ... (Update log logic remains the same) ...
             const logsRef = this.getCollectionRef('logs');
             if (!logsRef) return;
             try {
@@ -942,7 +943,6 @@
         },
         
         async deleteLog(logId) {
-            // ... (Delete log logic remains the same) ...
             const logsRef = this.getCollectionRef('logs');
             if (!logsRef) return;
             try {
@@ -1071,13 +1071,11 @@
             contentContainer.removeEventListener('submit', this.boundCertFormHandler);
 
             // Re-attach listeners for main app forms
-            // Note: handleNewLogSubmit is bound in render() for the main log form.
             this.boundLogFormHandler = (e) => { if (e.target.id === 'new-log-form') this.handleNewLogSubmit(e); };
             this.boundGearFormHandler = (e) => { if (e.target.id === 'new-gear-form') this.handleNewGearSubmit(e); };
             this.boundCertFormHandler = (e) => { if (e.target.id === 'new-certification-form') this.handleNewCertificationSubmit(e); };
             
-            // Re-attach if needed (though render() re-attaches the log form one)
-            // contentContainer.addEventListener('submit', this.boundLogFormHandler); 
+            contentContainer.addEventListener('submit', this.boundLogFormHandler);
             contentContainer.addEventListener('submit', this.boundGearFormHandler);
             contentContainer.addEventListener('submit', this.boundCertFormHandler);
         },
@@ -1106,19 +1104,12 @@
                     this.gearList = [];
                     this.certifications = [];
                     
-                    // The auth form listener is added in the render method if not logged in
-                    const authFormContainer = document.getElementById('page-content');
-                    if (authFormContainer) {
-                        // Ensure the listener is only added once to the page content container
-                        if (!this.authListenerAttached) {
-                            authFormContainer.addEventListener('submit', (e) => {
-                                if (e.target.id === 'login-form' || e.target.id === 'register-form') {
-                                    this.handleAuthSubmit(e);
-                                }
-                            });
-                            this.authListenerAttached = true;
+                    // Attach Auth form handlers after rendering Auth UI
+                    document.getElementById('page-content').addEventListener('submit', (e) => {
+                        if (e.target.id === 'login-form' || e.target.id === 'register-form') {
+                            this.handleAuthSubmit(e);
                         }
-                    }
+                    });
                 }
                 this.render(); // Re-render based on login status
             });

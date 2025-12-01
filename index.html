@@ -588,7 +588,6 @@
         },
 
         renderHistoryTable() {
-            // ... (History table rendering remains the same) ...
             if (this.diveLogs.length === 0) {
                 return `<div class="text-center py-8 text-gray-500">尚無潛水紀錄。請新增您的第一次潛水！</div>`;
             }
@@ -597,12 +596,18 @@
             const validLogs = this.diveLogs.filter(l => l.avg_sac_l_min);
             const totalSac = validLogs.reduce((sum, l) => sum + l.avg_sac_l_min, 0);
             const avgSac = validLogs.length > 0 ? totalSac / validLogs.length : 0;
+            
+            // Sort by date desc
+            const sortedLogs = this.diveLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+            const totalDives = sortedLogs.length;
 
-
-            const rows = this.diveLogs.sort((a, b) => new Date(b.date) - new Date(a.date)).map(log => {
+            const rows = sortedLogs.map((log, index) => {
                 const sacDisplay = log.avg_sac_l_min ? `${log.avg_sac_l_min.toFixed(2)} L/min` : 'N/A';
+                const diveNumber = totalDives - index; // 倒序編號，最新的為總數，最舊的為1
+
                 return `
                     <tr class="border-b hover:bg-gray-50 transition duration-150 ease-in-out">
+                        <td class="px-3 py-3 whitespace-nowrap text-sm font-bold text-teal-600">#${diveNumber}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${log.date}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.location}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.depth_m} / ${log.avg_depth_m || '?'} m</td>
@@ -621,10 +626,20 @@
             }).join('');
 
             return `
+                <!-- 總計潛水次數 (Moved here) -->
+                <div class="bg-teal-50 p-4 rounded-lg shadow-sm border border-teal-100 flex items-center justify-between mb-6">
+                    <div>
+                        <h3 class="text-lg font-medium text-teal-800">總計潛水次數</h3>
+                        <p class="text-xs text-teal-600">紀錄您探索海洋的每一次感動</p>
+                    </div>
+                    <span class="text-4xl font-bold text-teal-600">${totalDives}</span>
+                </div>
+
                 <div class="overflow-x-auto shadow-md rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
+                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
                                 <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
                                 <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">潛點</th>
                                 <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最大/平均深度</th>
@@ -640,8 +655,7 @@
                 </div>
                 <div class="mt-4 flex justify-between text-sm text-gray-600">
                     <div>
-                        總計潛水次數：<span class="font-bold">${this.diveLogs.length}</span>
-                        ${userId ? `<span class="ml-4 text-xs text-gray-400">用戶 ID: ${userId}</span>` : ''}
+                        ${userId ? `<span class="text-xs text-gray-400">用戶 ID: ${userId}</span>` : ''}
                     </div>
                     <div class="text-right">
                         平均 SAC 率 (L/min)：<span class="font-bold text-blue-700">${avgSac.toFixed(2)}</span>
@@ -653,20 +667,14 @@
         // ... (renderInfoAndGearManager, renderCertifications, renderGearList - same as previous version) ...
 
         renderInfoAndGearManager() {
-            const totalDives = this.diveLogs.length;
-
+            // Removed total dives block from here
             return `
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- 潛水員證照管理 -->
                     <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
                         <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2 mb-4">潛水員證照管理</h2>
-
-                        <div class="bg-teal-50 p-4 rounded-md flex items-center justify-between">
-                            <span class="text-lg font-medium text-teal-800">總潛水次數</span>
-                            <span class="text-3xl font-bold text-teal-600">${totalDives}</span>
-                        </div>
                         
-                        <h3 class="text-xl font-medium text-gray-700 mt-4 border-t pt-4">新增證照</h3>
+                        <h3 class="text-xl font-medium text-gray-700 mt-4 pt-2">新增證照</h3>
                         <form id="new-certification-form" class="space-y-3">
                             <div>
                                 <label for="cert_agency" class="block text-sm font-medium text-gray-700">發證單位</label>

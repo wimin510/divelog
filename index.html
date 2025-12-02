@@ -67,10 +67,12 @@
         onAuthStateChanged, 
         signInWithEmailAndPassword, 
         createUserWithEmailAndPassword, 
-        signOut 
+        signOut,
+        signInAnonymously,
+        signInWithCustomToken
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import {
-        getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, setLogLevel, query, orderBy
+        getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, setLogLevel, query, orderBy, Timestamp
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // 依據使用者提供的設定
@@ -447,14 +449,6 @@
                 `;
             }).join('');
 
-            // Helper to generate input HTML
-            const renderInput = (id, label, type, val, required=false, placeholder='', extra='') => `
-                <div class="space-y-1 relative">
-                    <label for="${id}" class="block text-sm font-medium text-gray-700">${label}</label>
-                    <input type="${type}" id="${id}" name="${id}" ${required ? 'required' : ''} value="${val}" placeholder="${placeholder}" ${extra} class="mt-1 block w-full">
-                </div>
-            `;
-
             return `
                 <form id="${isEdit ? 'edit-log-form' : 'new-log-form'}" class="space-y-6">
                     <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">${title}</h2>
@@ -476,11 +470,11 @@
                             
                             <div class="space-y-1">
                                 <label for="entryTime" class="block text-sm font-medium text-gray-700">入水時間 (24H)</label>
-                                <input type="time" id="entryTime" name="entryTime" required value="${entryTime}">
+                                <input type="time" id="entryTime" name="entryTime" required value="${entryTime}" step="60">
                             </div>
                             <div class="space-y-1">
                                 <label for="exitTime" class="block text-sm font-medium text-gray-700">出水時間 (24H)</label>
-                                <input type="time" id="exitTime" name="exitTime" required value="${exitTime}">
+                                <input type="time" id="exitTime" name="exitTime" required value="${exitTime}" step="60">
                             </div>
 
                             <div class="md:col-span-2 space-y-1 mt-2">
@@ -910,10 +904,10 @@
                 <h3 class="text-xl font-semibold text-gray-900 mb-4">確認刪除紀錄</h3>
                 <p class="text-gray-700 mb-6">您確定要刪除 ${log.date} 在 ${log.location} 的潛水紀錄嗎？此操作不可逆。</p>
                 <div class="flex justify-end space-x-3">
-                    <button onclick="app.closeModal()" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                    <button onclick="app.closeModal()" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                         取消
                     </button>
-                    <button onclick="app.deleteLog('${logId}')" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition">
+                    <button onclick="app.deleteLog('${logId}')" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700">
                         確認刪除
                     </button>
                 </div>

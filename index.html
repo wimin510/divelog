@@ -19,6 +19,12 @@
             border-radius: 0.375rem; /* rounded-md */
             box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
             width: 100%;
+            background-color: #ffffff;
+        }
+        input:focus, textarea:focus, select:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
         }
         .metric-unit {
             position: absolute;
@@ -41,6 +47,7 @@
     <!-- 頁面容器 -->
     <div id="page-content">
         <!-- 內容將由 JavaScript 動態插入 (Auth Form / Main App) -->
+        <div class="text-center py-10 text-gray-500">載入中...</div>
     </div>
 
     <!-- 訊息彈窗 (Modal) -->
@@ -188,7 +195,7 @@
                     document.getElementById('dive-mode').addEventListener('change', this.toggleNitroxInput);
                     this.toggleNitroxInput();
                     
-                    // Add listeners for Time Calculation (New)
+                    // Add listeners for Time Calculation
                     const dateInput = document.getElementById('date');
                     const entryTimeInput = document.getElementById('entryTime');
                     const exitTimeInput = document.getElementById('exitTime');
@@ -218,7 +225,6 @@
         // --- Authentication UI ---
 
         renderAuthUI() {
-            // ... (Authentication UI rendering remains the same) ...
             const isLogin = this.authMode === 'login';
             const title = isLogin ? '潛水日誌登入' : '註冊新帳號';
             const buttonText = isLogin ? '登入' : '註冊';
@@ -271,7 +277,7 @@
             `;
         },
 
-        // --- Authentication Handlers (Remains the same) ---
+        // --- Authentication Handlers ---
 
         handleAuthSubmit(event) {
             event.preventDefault();
@@ -296,7 +302,6 @@
             this.authError = '';
             try {
                 await signInWithEmailAndPassword(auth, email, password);
-                // AuthStateChange listener handles navigation
             } catch (error) {
                 console.error("Login failed:", error);
                 let message = '登入失敗，請檢查電子郵件或密碼是否正確。';
@@ -311,7 +316,6 @@
             this.authError = '';
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
-                // AuthStateChange listener handles navigation
             } catch (error) {
                 console.error("Registration failed:", error);
                 let message = '註冊失敗。';
@@ -325,13 +329,12 @@
         async handleLogout() {
             try {
                 await signOut(auth);
-                // AuthStateChange listener handles navigation
             } catch (error) {
                 console.error("Logout failed:", error);
             }
         },
         
-        // --- Time & Date Calculation Logic (UPDATED) ---
+        // --- Time & Date Calculation Logic ---
 
         calculateDiveDuration() {
             const dateInput = document.getElementById('date');
@@ -339,47 +342,37 @@
             const exitInput = document.getElementById('exitTime');
             const durationInput = document.getElementById('time_min');
 
-            // Need date + entry time + exit time to calculate
             if (dateInput && entryInput && exitInput && dateInput.value && entryInput.value && exitInput.value) {
                 const dateStr = dateInput.value;
                 const start = new Date(`${dateStr}T${entryInput.value}`);
                 const end = new Date(`${dateStr}T${exitInput.value}`);
                 
-                // Difference in milliseconds
                 let diffMs = end - start;
-                
-                // Handle cross-midnight dives (if exit time is smaller than entry time, assume next day)
+                // Handle cross-midnight dives
                 if (diffMs < 0) {
-                    diffMs += 24 * 60 * 60 * 1000; // Add 24 hours
+                    diffMs += 24 * 60 * 60 * 1000;
                 }
                 
-                // Convert to minutes
                 if (diffMs > 0) {
                     const diffMins = Math.floor(diffMs / 60000);
                     if (durationInput) {
                         durationInput.value = diffMins;
-                        // Trigger input event manually so SAC calculation updates
                         durationInput.dispatchEvent(new Event('input'));
                     }
                 }
             }
         },
 
-        // --- SAC Calculation Logic (Remains the same) ---
+        // --- SAC Calculation Logic ---
 
         calculateSAC(avgDepthM, timeMin, startBar, endBar, tankVolumeL) {
             if (!avgDepthM || !timeMin || !startBar || !endBar || !tankVolumeL || timeMin <= 0 || startBar <= endBar) {
                 return null;
             }
-
             const pressureUsed = startBar - endBar; // bar
-            const avgPressureAtm = (avgDepthM / 10) + 1; // ATA (Atmospheres Absolute)
+            const avgPressureAtm = (avgDepthM / 10) + 1; // ATA
             const volumeUsed = pressureUsed * tankVolumeL; // Bar-Liters
-
-            // SAC = (Volume Used / Time) / Avg Pressure
-            const sac = (volumeUsed / timeMin) / avgPressureAtm;
-            
-            return sac; // L/min
+            return (volumeUsed / timeMin) / avgPressureAtm; // L/min
         },
 
         calculateAndDisplaySAC() {
@@ -410,33 +403,27 @@
                         **SAC 壓力消耗率：**
                         <span class="font-bold">${((sacValue / tankVolumeL) * 10).toFixed(2)} Bar/min (約為每米深度消耗的 Bar)</span>
                     </p>
-                    <p class="text-xs text-gray-400 mt-1">
-                        計算公式: SAC = [(起始壓力 - 結束壓力) * 氣瓶容積] / [潛水時間 * 平均深度絕對壓力]
-                    </p>
                 `;
                 resultElement.classList.remove('text-gray-500');
             } else {
                 resultElement.innerHTML = `
-                    <p class="text-gray-500">
-                        請輸入所有潛水數據 (深度、時間、壓力、容積) 且起始壓力需大於結束壓力以計算 SAC 率。
+                    <p class="text-gray-500 text-sm">
+                        請輸入完整深度、時間、壓力與氣瓶數據以計算 SAC。
                     </p>
                 `;
             }
         },
 
-        // --- View Rendering Functions (UPDATED) ---
+        // --- View Rendering Functions ---
 
         renderLogEntryForm(log = null) {
             const isEdit = !!log;
             const title = isEdit ? '修改潛水紀錄' : '新增潛水紀錄';
             const buttonText = isEdit ? '儲存變更' : '新增紀錄';
             
-            // Default values for new log or values from existing log
             const logDate = log ? log.date : new Date().toISOString().substring(0, 10);
-            // Modified: Only use HH:MM format for time inputs
             const entryTime = log ? (log.entryTime || '') : '';
             const exitTime = log ? (log.exitTime || '') : '';
-            
             const diveType = log ? (log.diveType || '岸潛') : '岸潛';
             const waveCondition = log ? (log.waveCondition || '') : '';
             const currentCondition = log ? (log.currentCondition || '') : '';
@@ -444,15 +431,12 @@
             const mode = log ? log.mode : 'Air';
             const o2_percent = log ? log.o2_percent : '21';
             const avg_depth_m = log ? log.avg_depth_m : '';
-            const tank_volume_l = log ? log.tank_volume_l : '12.0'; // Default to a standard 12L tank
-            
-            // New fields
+            const tank_volume_l = log ? log.tank_volume_l : '12.0';
             const weight_kg = log ? (log.weight_kg || '') : '';
             const buddy = log ? (log.buddy || '') : '';
             const dive_guide = log ? (log.dive_guide || '') : '';
             const dive_shop = log ? (log.dive_shop || '') : '';
 
-            // Gear checkboxes rendering
             const gearCheckboxes = this.gearList.map(gear => {
                 const isChecked = log && log.gear_used && log.gear_used.includes(gear.name);
                 return `
@@ -463,193 +447,207 @@
                 `;
             }).join('');
 
+            // Helper to generate input HTML
+            const renderInput = (id, label, type, val, required=false, placeholder='', extra='') => `
+                <div class="space-y-1 relative">
+                    <label for="${id}" class="block text-sm font-medium text-gray-700">${label}</label>
+                    <input type="${type}" id="${id}" name="${id}" ${required ? 'required' : ''} value="${val}" placeholder="${placeholder}" ${extra} class="mt-1 block w-full">
+                </div>
+            `;
 
             return `
-                <form id="${isEdit ? 'edit-log-form' : 'new-log-form'}" class="space-y-4 p-4 md:p-6 bg-white rounded-lg shadow-md">
-                    <h2 class="text-2xl font-semibold text-gray-800 mb-4">${title}</h2>
+                <form id="${isEdit ? 'edit-log-form' : 'new-log-form'}" class="space-y-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">${title}</h2>
 
-                    <!-- 基本資訊與潛點 -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="space-y-1">
-                            <label for="date" class="block text-sm font-medium text-gray-700">潛水日期</label>
-                            <input type="date" id="date" name="date" required value="${logDate}">
-                        </div>
-                        <div class="space-y-1">
-                            <label for="location" class="block text-sm font-medium text-gray-700">潛點名稱</label>
-                            <input type="text" id="location" name="location" required placeholder="如：綠島大白沙" value="${log ? log.location : ''}">
+                    <!-- Block 1: 時間與類型 (Blue) -->
+                    <div class="bg-blue-50 border-t-4 border-blue-500 p-4 rounded-lg shadow-sm">
+                        <h3 class="text-lg font-bold text-blue-800 mb-4 flex items-center">
+                            <span class="mr-2">⏱️</span> 時間與類型
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label for="date" class="block text-sm font-medium text-gray-700">潛水日期</label>
+                                <input type="date" id="date" name="date" required value="${logDate}">
+                            </div>
+                            <div class="space-y-1">
+                                <label for="location" class="block text-sm font-medium text-gray-700">潛點名稱</label>
+                                <input type="text" id="location" name="location" required placeholder="如：綠島大白沙" value="${log ? log.location : ''}">
+                            </div>
+                            
+                            <div class="space-y-1">
+                                <label for="entryTime" class="block text-sm font-medium text-gray-700">入水時間 (24H)</label>
+                                <input type="time" id="entryTime" name="entryTime" required value="${entryTime}">
+                            </div>
+                            <div class="space-y-1">
+                                <label for="exitTime" class="block text-sm font-medium text-gray-700">出水時間 (24H)</label>
+                                <input type="time" id="exitTime" name="exitTime" required value="${exitTime}">
+                            </div>
+
+                            <div class="md:col-span-2 space-y-1 mt-2">
+                                <label class="block text-sm font-medium text-gray-700">潛水類型</label>
+                                <div class="flex space-x-6 p-2 bg-white rounded-md border border-blue-100">
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="radio" name="diveType" value="岸潛" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" ${diveType === '岸潛' ? 'checked' : ''} required>
+                                        <span class="ml-2 text-sm text-gray-700">岸潛 (Shore Dive)</span>
+                                    </label>
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="radio" name="diveType" value="船潛" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" ${diveType === '船潛' ? 'checked' : ''} required>
+                                        <span class="ml-2 text-sm text-gray-700">船潛 (Boat Dive)</span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- 1. 入水時間和出水時間 (UPDATED: type="time") -->
-                    <h3 class="text-xl font-medium text-gray-700 mt-6 pt-4 border-t">時間與類型</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="space-y-1">
-                            <label for="entryTime" class="block text-sm font-medium text-gray-700">入水時間</label>
-                            <input type="time" id="entryTime" name="entryTime" required value="${entryTime}">
+                    <!-- Block 2: 深度與氣體資訊 (Green) -->
+                    <div class="bg-emerald-50 border-t-4 border-emerald-500 p-4 rounded-lg shadow-sm">
+                        <h3 class="text-lg font-bold text-emerald-800 mb-4 flex items-center">
+                            <span class="mr-2">🧪</span> 深度與氣體資訊
+                        </h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="space-y-1 relative">
+                                <label for="depth_m" class="block text-sm font-medium text-gray-700">最大深度</label>
+                                <input type="number" id="depth_m" name="depth_m" required placeholder="0.0" step="0.1" min="0" value="${log ? log.depth_m : ''}">
+                                <span class="metric-unit">m</span>
+                            </div>
+                            <div class="space-y-1 relative">
+                                <label for="avg_depth_m" class="block text-sm font-medium text-gray-700">平均深度</label>
+                                <input type="number" id="avg_depth_m" name="avg_depth_m" required placeholder="0.0" step="0.1" min="0" value="${avg_depth_m}">
+                                <span class="metric-unit">m</span>
+                            </div>
+                            <div class="space-y-1 relative">
+                                <label for="time_min" class="block text-sm font-medium text-gray-700">潛水時間</label>
+                                <input type="number" id="time_min" name="time_min" required placeholder="0" min="1" value="${log ? log.time_min : ''}">
+                                <span class="metric-unit">min</span>
+                            </div>
+                            <div class="space-y-1 relative">
+                                <label for="tank_volume_l" class="block text-sm font-medium text-gray-700">氣瓶容積</label>
+                                <input type="number" id="tank_volume_l" name="tank_volume_l" required placeholder="12.0" step="0.1" min="1" value="${tank_volume_l}">
+                                <span class="metric-unit">L</span>
+                            </div>
                         </div>
-                        <div class="space-y-1">
-                            <label for="exitTime" class="block text-sm font-medium text-gray-700">出水時間</label>
-                            <input type="time" id="exitTime" name="exitTime" required value="${exitTime}">
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                            <div class="space-y-1 relative">
+                                <label for="air_start_bar" class="block text-sm font-medium text-gray-700">起始壓力</label>
+                                <input type="number" id="air_start_bar" name="air_start_bar" required placeholder="200" min="0" value="${log ? log.air_start_bar : ''}">
+                                <span class="metric-unit">bar</span>
+                            </div>
+                            <div class="space-y-1 relative">
+                                <label for="air_end_bar" class="block text-sm font-medium text-gray-700">結束壓力</label>
+                                <input type="number" id="air_end_bar" name="air_end_bar" required placeholder="50" min="0" value="${log ? log.air_end_bar : ''}">
+                                <span class="metric-unit">bar</span>
+                            </div>
+                            <div class="space-y-1">
+                                <label for="dive-mode" class="block text-sm font-medium text-gray-700">潛水模式</label>
+                                <select id="dive-mode" name="mode" class="mt-1 block w-full">
+                                    <option value="Air" ${mode === 'Air' ? 'selected' : ''}>空氣 (Air)</option>
+                                    <option value="Nitrox" ${mode === 'Nitrox' ? 'selected' : ''}>高氧 (Nitrox)</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1 relative" id="nitrox-input-group">
+                                <label for="o2_percent" class="block text-sm font-medium text-gray-700">高氧 O₂ %</label>
+                                <input type="number" id="o2_percent" name="o2_percent" placeholder="21-100" min="21" max="100" value="${o2_percent}">
+                                <span class="metric-unit">%</span>
+                            </div>
+                        </div>
+                        
+                        <!-- SAC Result within Green Block -->
+                        <div id="sac-result" class="mt-4 p-3 bg-white bg-opacity-60 rounded-md border border-emerald-200">
+                            <!-- JS will populate this -->
                         </div>
                     </div>
 
-                    <!-- 2. 潛水類型 -->
-                    <div class="space-y-1 mt-4">
-                        <label class="block text-sm font-medium text-gray-700">潛水類型</label>
-                        <div class="flex space-x-6 p-2 bg-gray-50 rounded-md">
-                            <label class="flex items-center">
-                                <input type="radio" name="diveType" value="岸潛" class="h-4 w-4 text-teal-600 border-gray-300 focus:ring-teal-500" ${diveType === '岸潛' ? 'checked' : ''} required>
-                                <span class="ml-2 text-sm text-gray-700">岸潛 (Shore Dive)</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="radio" name="diveType" value="船潛" class="h-4 w-4 text-teal-600 border-gray-300 focus:ring-teal-500" ${diveType === '船潛' ? 'checked' : ''} required>
-                                <span class="ml-2 text-sm text-gray-700">船潛 (Boat Dive)</span>
-                            </label>
+                    <!-- Block 3: 環境狀況 (Orange) -->
+                    <div class="bg-amber-50 border-t-4 border-amber-500 p-4 rounded-lg shadow-sm">
+                        <h3 class="text-lg font-bold text-amber-800 mb-4 flex items-center">
+                            <span class="mr-2">☀️</span> 環境狀況
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="space-y-1">
+                                <label for="weather" class="block text-sm font-medium text-gray-700">天氣</label>
+                                <select id="weather" name="weather" class="mt-1 block w-full" required>
+                                    <option value="" ${!weather ? 'selected' : ''} disabled>請選擇</option>
+                                    <option value="晴朗無雲" ${weather === '晴朗無雲' ? 'selected' : ''}>晴朗無雲</option>
+                                    <option value="陰天多雲" ${weather === '陰天多雲' ? 'selected' : ''}>陰天多雲</option>
+                                    <option value="雨" ${weather === '雨' ? 'selected' : ''}>雨</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <label for="waveCondition" class="block text-sm font-medium text-gray-700">浪況</label>
+                                <select id="waveCondition" name="waveCondition" class="mt-1 block w-full" required>
+                                    <option value="" ${!waveCondition ? 'selected' : ''} disabled>請選擇</option>
+                                    <option value="無浪" ${waveCondition === '無浪' ? 'selected' : ''}>無浪</option>
+                                    <option value="微浪" ${waveCondition === '微浪' ? 'selected' : ''}>微浪</option>
+                                    <option value="小至中浪" ${waveCondition === '小至中浪' ? 'selected' : ''}>小至中浪</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <label for="currentCondition" class="block text-sm font-medium text-gray-700">流況</label>
+                                <select id="currentCondition" name="currentCondition" class="mt-1 block w-full" required>
+                                    <option value="" ${!currentCondition ? 'selected' : ''} disabled>請選擇</option>
+                                    <option value="無流" ${currentCondition === '無流' ? 'selected' : ''}>無流</option>
+                                    <option value="微流" ${currentCondition === '微流' ? 'selected' : ''}>微流</option>
+                                    <option value="小至中流" ${currentCondition === '小至中流' ? 'selected' : ''}>小至中流</option>
+                                    <option value="中至大流" ${currentCondition === '中至大流' ? 'selected' : ''}>中至大流</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mt-4">
+                            <div class="space-y-1 relative">
+                                <label for="water_temp_c" class="block text-sm font-medium text-gray-700">水溫</label>
+                                <input type="number" id="water_temp_c" name="water_temp_c" placeholder="0.0" step="0.1" value="${log ? log.water_temp_c : ''}">
+                                <span class="metric-unit">°C</span>
+                            </div>
+                            <div class="space-y-1 relative">
+                                <label for="visibility_m" class="block text-sm font-medium text-gray-700">能見度</label>
+                                <input type="number" id="visibility_m" name="visibility_m" placeholder="0" min="0" value="${log ? log.visibility_m : ''}">
+                                <span class="metric-unit">m</span>
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- 新增：團隊與後勤資訊 -->
-                    <h3 class="text-xl font-medium text-gray-700 mt-6 pt-4 border-t">團隊與後勤</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="space-y-1 relative">
-                            <label for="weight_kg" class="block text-sm font-medium text-gray-700">配重</label>
-                            <input type="number" id="weight_kg" name="weight_kg" placeholder="0.0" step="0.5" min="0" value="${weight_kg}">
-                            <span class="metric-unit">kg</span>
+
+                    <!-- Block 4: 團隊與後勤 (Purple) -->
+                    <div class="bg-indigo-50 border-t-4 border-indigo-500 p-4 rounded-lg shadow-sm">
+                        <h3 class="text-lg font-bold text-indigo-800 mb-4 flex items-center">
+                            <span class="mr-2">🤝</span> 團隊與後勤
+                        </h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            <div class="space-y-1 relative">
+                                <label for="weight_kg" class="block text-sm font-medium text-gray-700">配重</label>
+                                <input type="number" id="weight_kg" name="weight_kg" placeholder="0.0" step="0.5" min="0" value="${weight_kg}">
+                                <span class="metric-unit">kg</span>
+                            </div>
+                            <div class="space-y-1">
+                                <label for="dive_guide" class="block text-sm font-medium text-gray-700">潛導</label>
+                                <input type="text" id="dive_guide" name="dive_guide" placeholder="導潛姓名" value="${dive_guide}">
+                            </div>
+                            <div class="space-y-1 md:col-span-2">
+                                <label for="dive_shop" class="block text-sm font-medium text-gray-700">潛店</label>
+                                <input type="text" id="dive_shop" name="dive_shop" placeholder="潛水中心名稱" value="${dive_shop}">
+                            </div>
                         </div>
-                        <div class="space-y-1">
-                            <label for="dive_guide" class="block text-sm font-medium text-gray-700">潛導</label>
-                            <input type="text" id="dive_guide" name="dive_guide" placeholder="導潛姓名" value="${dive_guide}">
-                        </div>
-                        <div class="space-y-1 md:col-span-2">
+                        <div class="space-y-1 mb-4">
                             <label for="buddy" class="block text-sm font-medium text-gray-700">潛伴</label>
                             <input type="text" id="buddy" name="buddy" placeholder="潛伴姓名 (多位可用逗號分隔)" value="${buddy}">
                         </div>
-                    </div>
-                    <div class="mt-4 space-y-1">
-                        <label for="dive_shop" class="block text-sm font-medium text-gray-700">潛店</label>
-                        <input type="text" id="dive_shop" name="dive_shop" placeholder="潛水中心/店家名稱" value="${dive_shop}">
-                    </div>
+                        
+                        <div class="space-y-1 mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">個人裝備</label>
+                            <div id="gear-checkbox-container" class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-white rounded-md border border-indigo-100">
+                                ${gearCheckboxes || '<p class="col-span-3 text-sm text-gray-500">請先在潛水員/裝備管理頁面新增您的個人裝備。</p>'}
+                            </div>
+                        </div>
 
-                    
-                    <!-- 3, 4, 5. 浪況、流況、天氣 -->
-                    <h3 class="text-xl font-medium text-gray-700 mt-6 pt-4 border-t">環境狀況</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div class="space-y-1">
-                            <label for="waveCondition" class="block text-sm font-medium text-gray-700">浪況</label>
-                            <select id="waveCondition" name="waveCondition" class="mt-1 block w-full" required>
-                                <option value="" ${!waveCondition ? 'selected' : ''} disabled>請選擇</option>
-                                <option value="無浪" ${waveCondition === '無浪' ? 'selected' : ''}>無浪</option>
-                                <option value="微浪" ${waveCondition === '微浪' ? 'selected' : ''}>微浪</option>
-                                <option value="小至中浪" ${waveCondition === '小至中浪' ? 'selected' : ''}>小至中浪</option>
-                            </select>
-                        </div>
-                        <div class="space-y-1">
-                            <label for="currentCondition" class="block text-sm font-medium text-gray-700">流況</label>
-                            <select id="currentCondition" name="currentCondition" class="mt-1 block w-full" required>
-                                <option value="" ${!currentCondition ? 'selected' : ''} disabled>請選擇</option>
-                                <option value="無流" ${currentCondition === '無流' ? 'selected' : ''}>無流</option>
-                                <option value="微流" ${currentCondition === '微流' ? 'selected' : ''}>微流</option>
-                                <option value="小至中流" ${currentCondition === '小至中流' ? 'selected' : ''}>小至中流</option>
-                                <option value="中至大流" ${currentCondition === '中至大流' ? 'selected' : ''}>中至大流</option>
-                            </select>
-                        </div>
-                        <div class="space-y-1">
-                            <label for="weather" class="block text-sm font-medium text-gray-700">天氣</label>
-                            <select id="weather" name="weather" class="mt-1 block w-full" required>
-                                <option value="" ${!weather ? 'selected' : ''} disabled>請選擇</option>
-                                <option value="晴朗無雲" ${weather === '晴朗無雲' ? 'selected' : ''}>晴朗無雲</option>
-                                <option value="陰天多雲" ${weather === '陰天多雲' ? 'selected' : ''}>陰天多雲</option>
-                                <option value="雨" ${weather === '雨' ? 'selected' : ''}>雨</option>
-                            </select>
+                            <label for="notes" class="block text-sm font-medium text-gray-700">潛水筆記/備註</label>
+                            <textarea id="notes" name="notes" rows="3" placeholder="紀錄潛水心得、看到的海生物等..." class="mt-1 block w-full">${log ? log.notes : ''}</textarea>
                         </div>
                     </div>
 
-
-                    <!-- 深度與時間資訊 (Existing Fields) -->
-                    <h3 class="text-xl font-medium text-gray-700 mt-6 pt-4 border-t">深度與氣體資訊</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="space-y-1 relative">
-                            <label for="depth_m" class="block text-sm font-medium text-gray-700">最大深度</label>
-                            <input type="number" id="depth_m" name="depth_m" required placeholder="0.0" step="0.1" min="0" value="${log ? log.depth_m : ''}">
-                            <span class="metric-unit">公尺 (m)</span>
-                        </div>
-                        <div class="space-y-1 relative">
-                            <label for="avg_depth_m" class="block text-sm font-medium text-gray-700">平均深度</label>
-                            <input type="number" id="avg_depth_m" name="avg_depth_m" required placeholder="0.0" step="0.1" min="0" value="${avg_depth_m}">
-                            <span class="metric-unit">公尺 (m)</span>
-                        </div>
-                        <div class="space-y-1 relative">
-                            <label for="time_min" class="block text-sm font-medium text-gray-700">潛水時間</label>
-                            <input type="number" id="time_min" name="time_min" required placeholder="0" min="1" value="${log ? log.time_min : ''}">
-                            <span class="metric-unit">分鐘 (min)</span>
-                        </div>
-                        <div class="space-y-1 relative">
-                            <label for="tank_volume_l" class="block text-sm font-medium text-gray-700">氣瓶容積</label>
-                            <input type="number" id="tank_volume_l" name="tank_volume_l" required placeholder="12.0" step="0.1" min="1" value="${tank_volume_l}">
-                            <span class="metric-unit">公升 (L)</span>
-                        </div>
-                    </div>
-
-                    
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="space-y-1 relative">
-                            <label for="air_start_bar" class="block text-sm font-medium text-gray-700">氣瓶起始壓力</label>
-                            <input type="number" id="air_start_bar" name="air_start_bar" required placeholder="200" min="0" value="${log ? log.air_start_bar : ''}">
-                            <span class="metric-unit">bar</span>
-                        </div>
-                        <div class="space-y-1 relative">
-                            <label for="air_end_bar" class="block text-sm font-medium text-gray-700">氣瓶結束壓力</label>
-                            <input type="number" id="air_end_bar" name="air_end_bar" required placeholder="50" min="0" value="${log ? log.air_end_bar : ''}">
-                            <span class="metric-unit">bar</span>
-                        </div>
-                        <div class="space-y-1">
-                            <label for="dive-mode" class="block text-sm font-medium text-gray-700">潛水模式</label>
-                            <select id="dive-mode" name="mode" class="mt-1 block w-full">
-                                <option value="Air" ${mode === 'Air' ? 'selected' : ''}>空氣 (Air)</option>
-                                <option value="Nitrox" ${mode === 'Nitrox' ? 'selected' : ''}>高氧 (Nitrox)</option>
-                            </select>
-                        </div>
-                        <div class="space-y-1 relative" id="nitrox-input-group">
-                            <label for="o2_percent" class="block text-sm font-medium text-gray-700">高氧 O₂ %</label>
-                            <input type="number" id="o2_percent" name="o2_percent" placeholder="21-100" min="21" max="100" value="${o2_percent}">
-                            <span class="metric-unit">%</span>
-                        </div>
-                    </div>
-
-                    <!-- SAC Calculation Result Display -->
-                    <div id="sac-result" class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400 mt-6 transition duration-150 ease-in-out">
-                        <!-- SAC result will be displayed here -->
-                    </div>
-
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="space-y-1 relative">
-                            <label for="water_temp_c" class="block text-sm font-medium text-gray-700">水溫</label>
-                            <input type="number" id="water_temp_c" name="water_temp_c" placeholder="0.0" step="0.1" value="${log ? log.water_temp_c : ''}">
-                            <span class="metric-unit">°C</span>
-                        </div>
-                        <div class="space-y-1 relative">
-                            <label for="visibility_m" class="block text-sm font-medium text-gray-700">能見度</label>
-                            <input type="number" id="visibility_m" name="visibility_m" placeholder="0" min="0" value="${log ? log.visibility_m : ''}">
-                            <span class="metric-unit">公尺 (m)</span>
-                        </div>
-                    </div>
-
-
-                    <div class="space-y-1">
-                        <label class="block text-sm font-medium text-gray-700">個人裝備 (勾選本次使用的裝備)</label>
-                        <div id="gear-checkbox-container" class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-gray-50 rounded-md border border-gray-200">
-                            ${gearCheckboxes || '<p class="col-span-3 text-sm text-gray-500">請先在潛水員/裝備管理頁面新增您的個人裝備。</p>'}
-                        </div>
-                    </div>
-
-                    <div class="space-y-1">
-                        <label for="notes" class="block text-sm font-medium text-gray-700">潛水筆記/備註</label>
-                        <textarea id="notes" name="notes" rows="3" placeholder="紀錄潛水心得、看到的海生物等..." class="mt-1 block w-full">${log ? log.notes : ''}</textarea>
-                    </div>
-
-                    <div class="flex justify-end space-x-3 mt-6">
-                        ${isEdit ? '<button type="button" onclick="app.closeModal()" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">取消</button>' : ''}
-                        <button type="submit" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500">
+                    <div class="flex justify-end space-x-3 mt-8 pb-4">
+                        ${isEdit ? '<button type="button" onclick="app.closeModal()" class="py-2 px-6 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">取消</button>' : ''}
+                        <button type="submit" class="py-2 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition shadow-md">
                             ${buttonText}
                         </button>
                     </div>
@@ -659,7 +657,7 @@
 
         renderHistoryTable() {
             if (this.diveLogs.length === 0) {
-                return `<div class="text-center py-8 text-gray-500">尚無潛水紀錄。請新增您的第一次潛水！</div>`;
+                return `<div class="text-center py-12 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">尚無潛水紀錄。請新增您的第一次潛水！</div>`;
             }
 
             // Calculate average SAC for display
@@ -672,50 +670,43 @@
             const totalDives = sortedLogs.length;
 
             const rows = sortedLogs.map((log, index) => {
-                const sacDisplay = log.avg_sac_l_min ? `${log.avg_sac_l_min.toFixed(2)} L/min` : 'N/A';
-                const diveNumber = totalDives - index; // 倒序編號，最新的為總數，最舊的為1
+                const sacDisplay = log.avg_sac_l_min ? `${log.avg_sac_l_min.toFixed(2)}` : '-';
+                const diveNumber = totalDives - index; // 倒序編號
 
                 return `
                     <tr class="border-b hover:bg-gray-50 transition duration-150 ease-in-out">
                         <td class="px-3 py-3 whitespace-nowrap text-sm font-bold text-teal-600">#${diveNumber}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${log.date}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.location}</td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.depth_m} / ${log.avg_depth_m || '?'} m</td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.time_min} min</td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-blue-700">${sacDisplay}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.depth_m}m / ${log.time_min}min</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-blue-600 font-medium">${sacDisplay}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
-                            <button onclick="app.openEditModal('${log.id}')" class="text-indigo-600 hover:text-indigo-900 mx-1">
-                                編輯
-                            </button>
-                            <button onclick="app.openDeleteModal('${log.id}')" class="text-red-600 hover:text-red-900 mx-1">
-                                刪除
-                            </button>
+                            <button onclick="app.openEditModal('${log.id}')" class="text-indigo-600 hover:text-indigo-900 mx-2 font-semibold">編輯</button>
+                            <button onclick="app.openDeleteModal('${log.id}')" class="text-red-600 hover:text-red-900 mx-2 font-semibold">刪除</button>
                         </td>
                     </tr>
                 `;
             }).join('');
 
             return `
-                <!-- 總計潛水次數 (Moved here) -->
-                <div class="bg-teal-50 p-4 rounded-lg shadow-sm border border-teal-100 flex items-center justify-between mb-6">
+                <div class="bg-teal-50 p-6 rounded-lg shadow-sm border border-teal-100 flex items-center justify-between mb-6">
                     <div>
-                        <h3 class="text-lg font-medium text-teal-800">總計潛水次數</h3>
-                        <p class="text-xs text-teal-600">紀錄您探索海洋的每一次感動</p>
+                        <h3 class="text-xl font-bold text-teal-800">總計潛水次數</h3>
+                        <p class="text-sm text-teal-600 mt-1">紀錄您探索海洋的每一次感動</p>
                     </div>
-                    <span class="text-4xl font-bold text-teal-600">${totalDives}</span>
+                    <span class="text-5xl font-extrabold text-teal-600">${totalDives}</span>
                 </div>
 
-                <div class="overflow-x-auto shadow-md rounded-lg">
+                <div class="overflow-x-auto shadow-md rounded-lg border border-gray-200">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">潛點</th>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最大/平均深度</th>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">時間</th>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-blue-600 uppercase tracking-wider">SAC (L/min)</th>
-                                <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">日期</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">潛點</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">深度/時間</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-blue-600 uppercase tracking-wider">SAC (L/min)</th>
+                                <th class="px-3 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">操作</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -723,21 +714,14 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="mt-4 flex justify-between text-sm text-gray-600">
-                    <div>
-                        ${userId ? `<span class="text-xs text-gray-400">用戶 ID: ${userId}</span>` : ''}
-                    </div>
-                    <div class="text-right">
-                        平均 SAC 率 (L/min)：<span class="font-bold text-blue-700">${avgSac.toFixed(2)}</span>
-                    </div>
+                <div class="mt-4 flex justify-between text-sm text-gray-600 px-2">
+                    <div>${userId ? `ID: <span class="font-mono text-xs">${userId.substring(0,8)}...</span>` : ''}</div>
+                    <div class="text-right">平均 SAC：<span class="font-bold text-blue-700">${avgSac.toFixed(2)} L/min</span></div>
                 </div>
             `;
         },
         
-        // ... (renderInfoAndGearManager, renderCertifications, renderGearList - same as previous version) ...
-
         renderInfoAndGearManager() {
-            // Removed total dives block from here
             return `
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- 潛水員證照管理 -->
@@ -763,7 +747,7 @@
                                 <input type="date" id="cert_date" name="date" class="mt-1 block w-full">
                             </div>
                             <div class="pt-2">
-                                <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                                <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition">
                                     新增證照
                                 </button>
                             </div>
@@ -781,7 +765,7 @@
 
                         <form id="new-gear-form" class="flex space-x-2">
                             <input type="text" id="new_gear_name" name="name" placeholder="輸入裝備名稱，如：Mares X-Stream 蛙鞋" required class="flex-grow">
-                            <button type="submit" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700">
+                            <button type="submit" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 transition">
                                 新增裝備
                             </button>
                         </form>
@@ -798,13 +782,12 @@
             const container = document.getElementById('certifications-list-container');
             if (!container) return;
             
-            // Only render the list part inside the container
             const listContainer = document.createElement('div');
             listContainer.className = "space-y-2";
 
             if (this.certifications.length === 0) {
                 listContainer.innerHTML = '<p class="text-sm text-gray-500">您尚未新增任何證照紀錄。</p>';
-                container.innerHTML = listContainer.outerHTML; // Replace innerHTML with the new structure
+                container.innerHTML = listContainer.outerHTML;
                 return;
             }
 
@@ -824,7 +807,6 @@
             `).join('');
 
             listContainer.innerHTML = list;
-            // Clear and re-append the list to the main container
             const existingList = container.querySelector('.space-y-2');
             if(existingList) existingList.remove();
             container.appendChild(listContainer);
@@ -928,10 +910,10 @@
                 <h3 class="text-xl font-semibold text-gray-900 mb-4">確認刪除紀錄</h3>
                 <p class="text-gray-700 mb-6">您確定要刪除 ${log.date} 在 ${log.location} 的潛水紀錄嗎？此操作不可逆。</p>
                 <div class="flex justify-end space-x-3">
-                    <button onclick="app.closeModal()" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <button onclick="app.closeModal()" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
                         取消
                     </button>
-                    <button onclick="app.deleteLog('${logId}')" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700">
+                    <button onclick="app.deleteLog('${logId}')" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition">
                         確認刪除
                     </button>
                 </div>

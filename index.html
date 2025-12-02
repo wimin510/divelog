@@ -200,14 +200,11 @@
                     document.getElementById('dive-mode').addEventListener('change', this.toggleNitroxInput);
                     this.toggleNitroxInput();
                     
-                    // Add listeners for Time Calculation
-                    const dateInput = document.getElementById('date');
-                    const entryTimeInput = document.getElementById('entryTime');
-                    const exitTimeInput = document.getElementById('exitTime');
-                    
-                    if (dateInput) dateInput.addEventListener('change', this.calculateDiveDuration.bind(this));
-                    if (entryTimeInput) entryTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
-                    if (exitTimeInput) exitTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                    // Add listeners for Time Calculation (using custom hour/min inputs)
+                    ['date', 'entryHour', 'entryMinute', 'exitHour', 'exitMinute'].forEach(id => {
+                        const input = document.getElementById(id);
+                        if (input) input.addEventListener('input', this.calculateDiveDuration.bind(this));
+                    });
 
                     // Add listeners for SAC calculation
                     ['depth_m', 'avg_depth_m', 'time_min', 'air_start_bar', 'air_end_bar', 'tank_volume_l'].forEach(id => {
@@ -344,16 +341,34 @@
         
         // --- Time & Date Calculation Logic ---
 
+        // Helper function to format hour/minute string (e.g., 9 -> "09")
+        pad(num) {
+            return num < 10 ? '0' + num : num;
+        },
+
+        // Function to get the full time string (HH:MM) from form inputs
+        getDiveTime(prefix) {
+            const hourInput = document.getElementById(`${prefix}Hour`);
+            const minuteInput = document.getElementById(`${prefix}Minute`);
+            
+            const hour = parseInt(hourInput?.value, 10);
+            const minute = parseInt(minuteInput?.value, 10);
+
+            if (isNaN(hour) || isNaN(minute)) return null;
+
+            return `${this.pad(hour)}:${this.pad(minute)}`;
+        },
+
         calculateDiveDuration() {
             const dateInput = document.getElementById('date');
-            const entryInput = document.getElementById('entryTime');
-            const exitInput = document.getElementById('exitTime');
+            const entryTimeStr = this.getDiveTime('entry');
+            const exitTimeStr = this.getDiveTime('exit');
             const durationInput = document.getElementById('time_min');
 
-            if (dateInput && entryInput && exitInput && dateInput.value && entryInput.value && exitInput.value) {
+            if (dateInput && dateInput.value && entryTimeStr && exitTimeStr) {
                 const dateStr = dateInput.value;
-                const start = new Date(`${dateStr}T${entryInput.value}`);
-                const end = new Date(`${dateStr}T${exitInput.value}`);
+                const start = new Date(`${dateStr}T${entryTimeStr}`);
+                const end = new Date(`${dateStr}T${exitTimeStr}`);
                 
                 let diffMs = end - start;
                 // Handle cross-midnight dives
@@ -424,6 +439,26 @@
 
         // --- View Rendering Functions ---
 
+        renderTimeInputs(prefix, labelText, timeString = '') {
+            const [hourStr, minuteStr] = timeString.split(':');
+            const hour = hourStr ? parseInt(hourStr, 10) : '';
+            const minute = minuteStr ? parseInt(minuteStr, 10) : '';
+
+            return `
+                <div class="space-y-1">
+                    <label class="block text-sm font-medium text-gray-700">${labelText} (24H)</label>
+                    <div class="flex space-x-2">
+                        <input type="number" id="${prefix}Hour" name="${prefix}Hour" 
+                                placeholder="時 (00-23)" min="0" max="23" 
+                                required class="w-1/2 text-center" value="${hour}">
+                        <input type="number" id="${prefix}Minute" name="${prefix}Minute" 
+                                placeholder="分 (00-59)" min="0" max="59" 
+                                required class="w-1/2 text-center" value="${minute}">
+                    </div>
+                </div>
+            `;
+        },
+
         renderLogEntryForm(log = null) {
             const isEdit = !!log;
             const title = isEdit ? '修改潛水紀錄' : '新增潛水紀錄';
@@ -474,14 +509,10 @@
                                 <input type="text" id="location" name="location" required placeholder="如：綠島大白沙" value="${log ? log.location : ''}">
                             </div>
                             
-                            <div class="space-y-1">
-                                <label for="entryTime" class="block text-sm font-medium text-gray-700">入水時間 (24H)</label>
-                                <input type="time" id="entryTime" name="entryTime" required value="${entryTime}" step="60">
-                            </div>
-                            <div class="space-y-1">
-                                <label for="exitTime" class="block text-sm font-medium text-gray-700">出水時間 (24H)</label>
-                                <input type="time" id="exitTime" name="exitTime" required value="${exitTime}" step="60">
-                            </div>
+                            <!-- 修正為 24H 數值輸入 -->
+                            ${this.renderTimeInputs('entry', '入水時間', entryTime)}
+                            ${this.renderTimeInputs('exit', '出水時間', exitTime)}
+                            <!-- 修正結束 -->
 
                             <div class="md:col-span-2 space-y-1 mt-2">
                                 <label class="block text-sm font-medium text-gray-700">潛水類型</label>
@@ -862,10 +893,12 @@
             const modalContent = document.getElementById('modal-content');
             modalContent.innerHTML = contentHTML;
             modalContainer.classList.remove('hidden');
-            // Bind listeners for forms/buttons inside the modal content
+            
+            // Attach listeners for forms/buttons inside the modal content
             if (this.currentEditingLog) {
                 document.getElementById('edit-log-form').addEventListener('submit', this.handleEditLogSubmit.bind(this));
                 document.getElementById('dive-mode').addEventListener('change', this.toggleNitroxInput);
+                
                 // Re-attach SAC listeners for the modal form
                 ['depth_m', 'avg_depth_m', 'time_min', 'air_start_bar', 'air_end_bar', 'tank_volume_l'].forEach(id => {
                     const input = document.getElementById(id);
@@ -873,12 +906,10 @@
                 });
                 
                 // Add listeners for Time Calculation (for Modal) - UPDATED
-                const dateInput = document.getElementById('date');
-                const entryTimeInput = document.getElementById('entryTime');
-                const exitTimeInput = document.getElementById('exitTime');
-                if (dateInput) dateInput.addEventListener('change', this.calculateDiveDuration.bind(this));
-                if (entryTimeInput) entryTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
-                if (exitTimeInput) exitTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                ['date', 'entryHour', 'entryMinute', 'exitHour', 'exitMinute'].forEach(id => {
+                    const input = document.getElementById(id);
+                    if (input) input.addEventListener('input', this.calculateDiveDuration.bind(this));
+                });
 
                 this.toggleNitroxInput(); // Initial check for edit modal
                 this.calculateAndDisplaySAC(); // Initial SAC calculation for edit modal
@@ -944,11 +975,15 @@
             }
         },
 
-        // --- UPDATED: handleNewLogSubmit to capture new fields ---
+        // --- UPDATED: handleNewLogSubmit to capture custom time inputs ---
         handleNewLogSubmit(event) {
             event.preventDefault();
             const form = event.target;
             const formData = new FormData(form);
+
+            // Get time strings from custom number inputs (guaranteed 24H)
+            const entryTime = this.getDiveTime('entry');
+            const exitTime = this.getDiveTime('exit');
 
             // Collect Gear Used
             const gearUsed = [];
@@ -967,9 +1002,9 @@
                 date: formData.get('date'),
                 location: formData.get('location'),
                 
-                // Time and Environment Fields (Updated)
-                entryTime: formData.get('entryTime'), // HH:MM
-                exitTime: formData.get('exitTime'),   // HH:MM
+                // Time and Environment Fields (Updated to use 24H string)
+                entryTime: entryTime, 
+                exitTime: exitTime,   
                 diveType: formData.get('diveType'),   // 岸潛 or 船潛
                 waveCondition: formData.get('waveCondition'), // 浪況
                 currentCondition: formData.get('currentCondition'), // 流況
@@ -1005,12 +1040,17 @@
             this.setPage('history');
         },
         
-        // --- UPDATED: handleEditLogSubmit to capture new fields ---
+        // --- UPDATED: handleEditLogSubmit to capture custom time inputs ---
         handleEditLogSubmit(event) {
             event.preventDefault();
             const form = event.target;
             const formData = new FormData(form);
             const logId = this.currentEditingLog.id;
+            
+            // Get time strings from custom number inputs (guaranteed 24H)
+            const entryTime = this.getDiveTime('entry');
+            const exitTime = this.getDiveTime('exit');
+
 
             const gearUsed = [];
             formData.getAll('gear_used').forEach(item => gearUsed.push(item));
@@ -1027,9 +1067,9 @@
                 date: formData.get('date'),
                 location: formData.get('location'),
                 
-                // Time and Environment Fields (Updated)
-                entryTime: formData.get('entryTime'), // HH:MM
-                exitTime: formData.get('exitTime'),   // HH:MM
+                // Time and Environment Fields (Updated to use 24H string)
+                entryTime: entryTime, 
+                exitTime: exitTime,   
                 diveType: formData.get('diveType'),   // 岸潛 or 船潛
                 waveCondition: formData.get('waveCondition'), // 浪況
                 currentCondition: formData.get('currentCondition'), // 流況

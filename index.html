@@ -6,10 +6,13 @@
     <title>個人水肺潛水日誌 - 登入/註冊</title>
     <!-- 載入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 載入 Inter 字體 -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <!-- 載入 Noto Sans TC 字體 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
+        /* 修改字體為 Noto Sans TC */
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0f4f8; }
         .tab-active { border-color: #10b981; color: #10b981; font-weight: 600; }
         .tab-inactive { border-color: transparent; color: #6b7280; }
         /* Style for form elements to be consistent */
@@ -304,6 +307,7 @@
             this.authError = '';
             try {
                 await signInWithEmailAndPassword(auth, email, password);
+                // AuthStateChange listener handles navigation
             } catch (error) {
                 console.error("Login failed:", error);
                 let message = '登入失敗，請檢查電子郵件或密碼是否正確。';
@@ -318,6 +322,7 @@
             this.authError = '';
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
+                // AuthStateChange listener handles navigation
             } catch (error) {
                 console.error("Registration failed:", error);
                 let message = '註冊失敗。';
@@ -331,6 +336,7 @@
         async handleLogout() {
             try {
                 await signOut(auth);
+                // AuthStateChange listener handles navigation
             } catch (error) {
                 console.error("Logout failed:", error);
             }

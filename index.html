@@ -676,11 +676,11 @@
 
                 return `
                     <tr class="border-b hover:bg-gray-50 transition duration-150 ease-in-out">
-                        <td class="px-3 py-3 whitespace-nowrap text-sm font-bold text-teal-600">#${diveNumber}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-base font-bold text-teal-600">#${diveNumber}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-base font-medium text-gray-900">${log.date}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-base text-gray-700">${log.location}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-base text-gray-700">${log.depth_m}m / ${log.time_min}min</td>
-                        <td class="px-3 py-3 whitespace-nowrap text-sm text-blue-600 font-medium">${sacDisplay}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-base text-blue-600 font-medium">${sacDisplay}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
                             <button onclick="app.openEditModal('${log.id}')" class="text-indigo-600 hover:text-indigo-900 mx-2 font-semibold">編輯</button>
                             <button onclick="app.openDeleteModal('${log.id}')" class="text-red-600 hover:text-red-900 mx-2 font-semibold">刪除</button>
@@ -702,12 +702,12 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
-                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">日期</th>
-                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">潛點</th>
-                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">深度/時間</th>
-                                <th class="px-3 py-3 text-left text-xs font-bold text-blue-600 uppercase tracking-wider">SAC (L/min)</th>
-                                <th class="px-3 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">操作</th>
+                                <th class="px-3 py-3 text-left text-base font-bold text-gray-500 uppercase tracking-wider">#</th>
+                                <th class="px-3 py-3 text-left text-base font-bold text-gray-500 uppercase tracking-wider">日期</th>
+                                <th class="px-3 py-3 text-left text-base font-bold text-gray-500 uppercase tracking-wider">潛點</th>
+                                <th class="px-3 py-3 text-left text-base font-bold text-gray-500 uppercase tracking-wider">最大深度/潛水時間</th>
+                                <th class="px-3 py-3 text-left text-base font-bold text-blue-600 uppercase tracking-wider">SAC (L/min)</th>
+                                <th class="px-3 py-3 text-right text-base font-bold text-gray-500 uppercase tracking-wider">操作</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">

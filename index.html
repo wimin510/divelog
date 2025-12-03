@@ -202,13 +202,10 @@
                     this.toggleNitroxInput();
                     
                     // Add listeners for Time Calculation
-                    const dateInput = document.getElementById('date');
-                    const entryTimeInput = document.getElementById('entryTime');
-                    const exitTimeInput = document.getElementById('exitTime');
-                    
-                    if (dateInput) dateInput.addEventListener('change', this.calculateDiveDuration.bind(this));
-                    if (entryTimeInput) entryTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
-                    if (exitTimeInput) exitTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                    ['date', 'entryHour', 'entryMinute', 'exitHour', 'exitMinute'].forEach(id => {
+                        const input = document.getElementById(id);
+                        if (input) input.addEventListener('input', this.calculateDiveDuration.bind(this));
+                    });
 
                     // Add listeners for SAC calculation
                     ['depth_m', 'avg_depth_m', 'time_min', 'air_start_bar', 'air_end_bar', 'tank_volume_l'].forEach(id => {
@@ -345,16 +342,34 @@
         
         // --- Time & Date Calculation Logic ---
 
+        // Helper function to format hour/minute string (e.g., 9 -> "09")
+        pad(num) {
+            return num < 10 ? '0' + num : num;
+        },
+
+        // Function to get the full time string (HH:MM) from form inputs
+        getDiveTime(prefix) {
+            const hourInput = document.getElementById(`${prefix}Hour`);
+            const minuteInput = document.getElementById(`${prefix}Minute`);
+            
+            const hour = parseInt(hourInput?.value, 10);
+            const minute = parseInt(minuteInput?.value, 10);
+
+            if (isNaN(hour) || isNaN(minute)) return null;
+
+            return `${this.pad(hour)}:${this.pad(minute)}`;
+        },
+
         calculateDiveDuration() {
             const dateInput = document.getElementById('date');
-            const entryInput = document.getElementById('entryTime');
-            const exitInput = document.getElementById('exitTime');
+            const entryTimeStr = this.getDiveTime('entry');
+            const exitTimeStr = this.getDiveTime('exit');
             const durationInput = document.getElementById('time_min');
 
-            if (dateInput && entryInput && exitInput && dateInput.value && entryInput.value && exitInput.value) {
+            if (dateInput && dateInput.value && entryTimeStr && exitTimeStr) {
                 const dateStr = dateInput.value;
-                const start = new Date(`${dateStr}T${entryInput.value}`);
-                const end = new Date(`${dateStr}T${exitInput.value}`);
+                const start = new Date(`${dateStr}T${entryTimeStr}`);
+                const end = new Date(`${dateStr}T${exitTimeStr}`);
                 
                 let diffMs = end - start;
                 // Handle cross-midnight dives
@@ -425,14 +440,36 @@
 
         // --- View Rendering Functions ---
 
+        renderTimeInputs(prefix, labelText, timeString = '') {
+            const [hourStr, minuteStr] = timeString.split(':');
+            const hour = hourStr ? parseInt(hourStr, 10) : '';
+            const minute = minuteStr ? parseInt(minuteStr, 10) : '';
+
+            return `
+                <div class="space-y-1">
+                    <label class="block text-sm font-medium text-gray-700">${labelText} (24H)</label>
+                    <div class="flex space-x-2">
+                        <input type="number" id="${prefix}Hour" name="${prefix}Hour" 
+                                placeholder="時 (00-23)" min="0" max="23" 
+                                required class="w-1/2 text-center" value="${hour}">
+                        <input type="number" id="${prefix}Minute" name="${prefix}Minute" 
+                                placeholder="分 (00-59)" min="0" max="59" 
+                                required class="w-1/2 text-center" value="${minute}">
+                    </div>
+                </div>
+            `;
+        },
+
         renderLogEntryForm(log = null) {
             const isEdit = !!log;
             const title = isEdit ? '修改潛水紀錄' : '新增潛水紀錄';
             const buttonText = isEdit ? '儲存變更' : '新增紀錄';
             
             const logDate = log ? log.date : new Date().toISOString().substring(0, 10);
+            // Note: log.entryTime / log.exitTime are now stored as "HH:MM" strings
             const entryTime = log ? (log.entryTime || '') : '';
             const exitTime = log ? (log.exitTime || '') : '';
+            
             const diveType = log ? (log.diveType || '岸潛') : '岸潛';
             const waveCondition = log ? (log.waveCondition || '') : '';
             const currentCondition = log ? (log.currentCondition || '') : '';
@@ -475,14 +512,9 @@
                                 <input type="text" id="location" name="location" required placeholder="如：綠島大白沙" value="${log ? log.location : ''}">
                             </div>
                             
-                            <div class="space-y-1">
-                                <label for="entryTime" class="block text-sm font-medium text-gray-700">入水時間 (24H)</label>
-                                <input type="time" id="entryTime" name="entryTime" required value="${entryTime}" step="60">
-                            </div>
-                            <div class="space-y-1">
-                                <label for="exitTime" class="block text-sm font-medium text-gray-700">出水時間 (24H)</label>
-                                <input type="time" id="exitTime" name="exitTime" required value="${exitTime}" step="60">
-                            </div>
+                            <!-- 修正為 24H 數值輸入 (分離時/分) -->
+                            ${this.renderTimeInputs('entry', '入水時間', entryTime)}
+                            ${this.renderTimeInputs('exit', '出水時間', exitTime)}
 
                             <div class="md:col-span-2 space-y-1 mt-2">
                                 <label class="block text-sm font-medium text-gray-700">潛水類型</label>
@@ -666,21 +698,22 @@
             const totalSac = validLogs.reduce((sum, l) => sum + l.avg_sac_l_min, 0);
             const avgSac = validLogs.length > 0 ? totalSac / validLogs.length : 0;
             
-            // Sort by date desc
-            const sortedLogs = this.diveLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
-            const totalDives = sortedLogs.length;
+            const totalDives = this.diveLogs.length;
 
-            const rows = sortedLogs.map((log, index) => {
+            const rows = this.diveLogs.map((log, index) => {
                 const sacDisplay = log.avg_sac_l_min ? `${log.avg_sac_l_min.toFixed(2)}` : '-';
-                const diveNumber = totalDives - index; // 倒序編號
+                // Newest logs are at the top of the array (index 0)
+                // So dive number should decrease as index increases if we want latest to be highest #?
+                // Or simply total - index.
+                const diveNumber = totalDives - index; 
 
                 return `
                     <tr class="border-b hover:bg-gray-50 transition duration-150 ease-in-out">
-                        <td class="px-3 py-3 whitespace-nowrap text-base font-bold text-teal-600">#${diveNumber}</td>
-                        <td class="px-3 py-3 whitespace-nowrap text-base font-medium text-gray-900">${log.date}</td>
-                        <td class="px-3 py-3 whitespace-nowrap text-base text-gray-700">${log.location}</td>
-                        <td class="px-3 py-3 whitespace-nowrap text-base text-gray-700">${log.depth_m}m / ${log.time_min}min</td>
-                        <td class="px-3 py-3 whitespace-nowrap text-base text-blue-600 font-medium">${sacDisplay}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm font-bold text-teal-600">#${diveNumber}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${log.date}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.location}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.depth_m}m / ${log.time_min}min</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-blue-600 font-medium">${sacDisplay}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
                             <button onclick="app.openEditModal('${log.id}')" class="text-indigo-600 hover:text-indigo-900 mx-2 font-semibold">編輯</button>
                             <button onclick="app.openDeleteModal('${log.id}')" class="text-red-600 hover:text-red-900 mx-2 font-semibold">刪除</button>
@@ -702,12 +735,12 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-3 py-3 text-left text-base font-bold text-gray-500 uppercase tracking-wider">#</th>
-                                <th class="px-3 py-3 text-left text-base font-bold text-gray-500 uppercase tracking-wider">日期</th>
-                                <th class="px-3 py-3 text-left text-base font-bold text-gray-500 uppercase tracking-wider">潛點</th>
-                                <th class="px-3 py-3 text-left text-base font-bold text-gray-500 uppercase tracking-wider">最大深度/潛水時間</th>
-                                <th class="px-3 py-3 text-left text-base font-bold text-blue-600 uppercase tracking-wider">SAC (L/min)</th>
-                                <th class="px-3 py-3 text-right text-base font-bold text-gray-500 uppercase tracking-wider">操作</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">日期</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">潛點</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">深度/時間</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-blue-600 uppercase tracking-wider">SAC (L/min)</th>
+                                <th class="px-3 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">操作</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -960,8 +993,10 @@
 
             const location = formData.get('location');
             const date = formData.get('date');
-            const entryTime = formData.get('entryTime');
-            const exitTime = formData.get('exitTime');
+            
+            // FIX: Use helper function to construct time from split inputs
+            const entryTime = this.getDiveTime('entry');
+            const exitTime = this.getDiveTime('exit');
 
             // 嚴格驗證：確保日期、時間和地點都不為空
             if (!location || !date || !entryTime || !exitTime) {
@@ -1032,6 +1067,10 @@
             const form = event.target;
             const formData = new FormData(form);
             const logId = this.currentEditingLog.id;
+            
+            // FIX: Use helper function to construct time from split inputs
+            const entryTime = this.getDiveTime('entry');
+            const exitTime = this.getDiveTime('exit');
 
             const gearUsed = [];
             formData.getAll('gear_used').forEach(item => gearUsed.push(item));
@@ -1049,8 +1088,8 @@
                 location: formData.get('location'),
                 
                 // Time and Environment Fields (Updated)
-                entryTime: formData.get('entryTime'), // HH:MM
-                exitTime: formData.get('exitTime'),   // HH:MM
+                entryTime: entryTime, // HH:MM
+                exitTime: exitTime,   // HH:MM
                 diveType: formData.get('diveType'),   // 岸潛 or 船潛
                 waveCondition: formData.get('waveCondition'), // 浪況
                 currentCondition: formData.get('currentCondition'), // 流況
@@ -1150,7 +1189,7 @@
             }
         },
 
-        handleGearSubmit(event) {
+        handleNewGearSubmit(event) {
             event.preventDefault();
             const form = event.target;
             const gearName = document.getElementById('new_gear_name').value.trim();
@@ -1283,7 +1322,7 @@
 
             // Re-attach listeners for main app forms
             this.boundLogFormHandler = (e) => { if (e.target.id === 'new-log-form') this.handleNewLogSubmit(e); };
-            this.boundGearFormHandler = (e) => { if (e.target.id === 'new-gear-form') this.handleGearSubmit(e); }; // Changed to generic handler
+            this.boundGearFormHandler = (e) => { if (e.target.id === 'new-gear-form') this.handleNewGearSubmit(e); }; // Changed to generic handler
             this.boundCertFormHandler = (e) => { if (e.target.id === 'new-certification-form') this.handleNewCertificationSubmit(e); };
             
             contentContainer.addEventListener('submit', this.boundLogFormHandler);

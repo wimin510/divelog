@@ -964,10 +964,10 @@
             const exitTime = formData.get('exitTime');
 
             // 嚴格驗證：確保日期、時間和地點都不為空
-            //if (!location || !date || !entryTime || !exitTime) {
-            //    alert('請填寫日期、時間和地點等必要資訊。');
-            //    return;
-            //}
+            if (!location || !date || !entryTime || !exitTime) {
+                alert('請填寫日期、時間和地點等必要資訊。');
+                return;
+            }
 
             // Collect Gear Used
             const gearUsed = [];

@@ -107,7 +107,6 @@
         gearList: [],
         certifications: [],
         currentEditingLog: null,
-        currentEditingGear: null, // Track currently edited gear
         isLoggedIn: false, // New state for login status
         authMode: 'login', // 'login' or 'register'
         authError: '', // Store authentication errors
@@ -201,7 +200,7 @@
                     document.getElementById('dive-mode').addEventListener('change', this.toggleNitroxInput);
                     this.toggleNitroxInput();
                     
-                    // Add listeners for Time Calculation
+                    // Add listeners for Time Calculation (using custom hour/min inputs)
                     ['date', 'entryHour', 'entryMinute', 'exitHour', 'exitMinute'].forEach(id => {
                         const input = document.getElementById(id);
                         if (input) input.addEventListener('input', this.calculateDiveDuration.bind(this));
@@ -510,9 +509,10 @@
                                 <input type="text" id="location" name="location" required placeholder="如：綠島大白沙" value="${log ? log.location : ''}">
                             </div>
                             
-                            <!-- 修正為 24H 數值輸入 (分離時/分) -->
+                            <!-- 修正為 24H 數值輸入 -->
                             ${this.renderTimeInputs('entry', '入水時間', entryTime)}
                             ${this.renderTimeInputs('exit', '出水時間', exitTime)}
+                            <!-- 修正結束 -->
 
                             <div class="md:col-span-2 space-y-1 mt-2">
                                 <label class="block text-sm font-medium text-gray-700">潛水類型</label>
@@ -701,7 +701,7 @@
             const totalDives = sortedLogs.length;
 
             const rows = sortedLogs.map((log, index) => {
-                const sacDisplay = log.avg_sac_l_min ? `${log.avg_sac_l_min.toFixed(2)} L/min` : 'N/A';
+                const sacDisplay = log.avg_sac_l_min ? `${log.avg_sac_l_min.toFixed(2)}` : '-';
                 const diveNumber = totalDives - index; // 倒序編號
 
                 return `
@@ -712,12 +712,8 @@
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.depth_m}m / ${log.time_min}min</td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-blue-600 font-medium">${sacDisplay}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
-                            <button onclick="app.openEditModal('${log.id}')" class="text-indigo-600 hover:text-indigo-900 mx-1">
-                                編輯
-                            </button>
-                            <button onclick="app.openDeleteModal('${log.id}')" class="text-red-600 hover:text-red-900 mx-1">
-                                刪除
-                            </button>
+                            <button onclick="app.openEditModal('${log.id}')" class="text-indigo-600 hover:text-indigo-900 mx-2 font-semibold">編輯</button>
+                            <button onclick="app.openDeleteModal('${log.id}')" class="text-red-600 hover:text-red-900 mx-2 font-semibold">刪除</button>
                         </td>
                     </tr>
                 `;
@@ -739,7 +735,7 @@
                                 <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
                                 <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">日期</th>
                                 <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">潛點</th>
-                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">深度/時間</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">最大深度/潛水時間</th>
                                 <th class="px-3 py-3 text-left text-xs font-bold text-blue-600 uppercase tracking-wider">SAC (L/min)</th>
                                 <th class="px-3 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">操作</th>
                             </tr>
@@ -897,10 +893,12 @@
             const modalContent = document.getElementById('modal-content');
             modalContent.innerHTML = contentHTML;
             modalContainer.classList.remove('hidden');
-            // Bind listeners for forms/buttons inside the modal content
+            
+            // Attach listeners for forms/buttons inside the modal content
             if (this.currentEditingLog) {
                 document.getElementById('edit-log-form').addEventListener('submit', this.handleEditLogSubmit.bind(this));
                 document.getElementById('dive-mode').addEventListener('change', this.toggleNitroxInput);
+                
                 // Re-attach SAC listeners for the modal form
                 ['depth_m', 'avg_depth_m', 'time_min', 'air_start_bar', 'air_end_bar', 'tank_volume_l'].forEach(id => {
                     const input = document.getElementById(id);
@@ -908,12 +906,10 @@
                 });
                 
                 // Add listeners for Time Calculation (for Modal) - UPDATED
-                const dateInput = document.getElementById('date');
-                const entryTimeInput = document.getElementById('entryTime');
-                const exitTimeInput = document.getElementById('exitTime');
-                if (dateInput) dateInput.addEventListener('change', this.calculateDiveDuration.bind(this));
-                if (entryTimeInput) entryTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
-                if (exitTimeInput) exitTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                ['date', 'entryHour', 'entryMinute', 'exitHour', 'exitMinute'].forEach(id => {
+                    const input = document.getElementById(id);
+                    if (input) input.addEventListener('input', this.calculateDiveDuration.bind(this));
+                });
 
                 this.toggleNitroxInput(); // Initial check for edit modal
                 this.calculateAndDisplaySAC(); // Initial SAC calculation for edit modal
@@ -979,16 +975,13 @@
             }
         },
 
-        // --- UPDATED: handleNewLogSubmit to capture new fields ---
+        // --- UPDATED: handleNewLogSubmit to capture custom time inputs ---
         handleNewLogSubmit(event) {
             event.preventDefault();
             const form = event.target;
             const formData = new FormData(form);
 
-            const location = formData.get('location');
-            const date = formData.get('date');
-            
-            // FIX: Use helper function to construct time from split inputs
+            // Get time strings from custom number inputs (guaranteed 24H)
             const entryTime = this.getDiveTime('entry');
             const exitTime = this.getDiveTime('exit');
 
@@ -1006,12 +999,12 @@
             const sacValue = this.calculateSAC(avgDepthM, timeMin, startBar, endBar, tankVolumeL);
 
             const newLog = {
-                date: date,
-                location: location,
+                date: formData.get('date'),
+                location: formData.get('location'),
                 
-                // Time and Environment Fields (Updated)
-                entryTime: entryTime, // HH:MM
-                exitTime: exitTime,   // HH:MM
+                // Time and Environment Fields (Updated to use 24H string)
+                entryTime: entryTime, 
+                exitTime: exitTime,   
                 diveType: formData.get('diveType'),   // 岸潛 or 船潛
                 waveCondition: formData.get('waveCondition'), // 浪況
                 currentCondition: formData.get('currentCondition'), // 流況
@@ -1047,16 +1040,17 @@
             this.setPage('history');
         },
         
-        // --- UPDATED: handleEditLogSubmit to capture new fields ---
+        // --- UPDATED: handleEditLogSubmit to capture custom time inputs ---
         handleEditLogSubmit(event) {
             event.preventDefault();
             const form = event.target;
             const formData = new FormData(form);
             const logId = this.currentEditingLog.id;
             
-            // FIX: Use helper function to construct time from split inputs
+            // Get time strings from custom number inputs (guaranteed 24H)
             const entryTime = this.getDiveTime('entry');
             const exitTime = this.getDiveTime('exit');
+
 
             const gearUsed = [];
             formData.getAll('gear_used').forEach(item => gearUsed.push(item));
@@ -1073,9 +1067,9 @@
                 date: formData.get('date'),
                 location: formData.get('location'),
                 
-                // Time and Environment Fields (Updated)
-                entryTime: entryTime, // HH:MM
-                exitTime: exitTime,   // HH:MM
+                // Time and Environment Fields (Updated to use 24H string)
+                entryTime: entryTime, 
+                exitTime: exitTime,   
                 diveType: formData.get('diveType'),   // 岸潛 or 船潛
                 waveCondition: formData.get('waveCondition'), // 浪況
                 currentCondition: formData.get('currentCondition'), // 流況
@@ -1250,7 +1244,7 @@
 
             // Re-attach listeners for main app forms
             this.boundLogFormHandler = (e) => { if (e.target.id === 'new-log-form') this.handleNewLogSubmit(e); };
-            this.boundGearFormHandler = (e) => { if (e.target.id === 'new-gear-form') this.handleNewGearSubmit(e); }; // Changed to generic handler
+            this.boundGearFormHandler = (e) => { if (e.target.id === 'new-gear-form') this.handleNewGearSubmit(e); };
             this.boundCertFormHandler = (e) => { if (e.target.id === 'new-certification-form') this.handleNewCertificationSubmit(e); };
             
             contentContainer.addEventListener('submit', this.boundLogFormHandler);

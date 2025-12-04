@@ -107,6 +107,7 @@
         gearList: [],
         certifications: [],
         currentEditingLog: null,
+        currentEditingGear: null, // Track currently edited gear
         isLoggedIn: false, // New state for login status
         authMode: 'login', // 'login' or 'register'
         authError: '', // Store authentication errors
@@ -119,6 +120,10 @@
         
         setPage(page) {
             this.currentPage = page;
+            // 重置編輯狀態，避免切換頁面時殘留
+            if (page === 'info') {
+                this.currentEditingGear = null;
+            }
             this.render();
             this.updateTabs();
         },
@@ -153,7 +158,6 @@
                 // Attach Auth form handlers *after* rendering Auth UI
                 const authForm = document.getElementById('login-form') || document.getElementById('register-form');
                 if (authForm) {
-                    // We must clear existing listener to prevent stacking if render() is called multiple times without logout
                     authForm.removeEventListener('submit', this.boundAuthFormHandler);
                     this.boundAuthFormHandler = (e) => this.handleAuthSubmit(e);
                     authForm.addEventListener('submit', this.boundAuthFormHandler);
@@ -193,14 +197,14 @@
             switch (this.currentPage) {
                 case 'log':
                     contentArea.innerHTML = this.renderLogEntryForm();
-                    // Attach listeners for the log form after rendering
-                    const logForm = document.getElementById('new-log-form');
-                    if(logForm) logForm.addEventListener('submit', this.handleNewLogSubmit.bind(this));
+                    // [FIX: 1] 移除此處的 logForm 事件監聽器綁定
+                    // 因為 setupListeners 中的全域委派已經處理了表單提交。
+                    // 重複綁定會導致表單提交兩次：一次有數據，一次因為 form.reset() 而變為空白數據。
                     
                     document.getElementById('dive-mode').addEventListener('change', this.toggleNitroxInput);
                     this.toggleNitroxInput();
                     
-                    // Add listeners for Time Calculation (using custom hour/min inputs)
+                    // Add listeners for Time Calculation
                     ['date', 'entryHour', 'entryMinute', 'exitHour', 'exitMinute'].forEach(id => {
                         const input = document.getElementById(id);
                         if (input) input.addEventListener('input', this.calculateDiveDuration.bind(this));
@@ -304,7 +308,6 @@
             this.authError = '';
             try {
                 await signInWithEmailAndPassword(auth, email, password);
-                // AuthStateChange listener handles navigation
             } catch (error) {
                 console.error("Login failed:", error);
                 let message = '登入失敗，請檢查電子郵件或密碼是否正確。';
@@ -319,7 +322,6 @@
             this.authError = '';
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
-                // AuthStateChange listener handles navigation
             } catch (error) {
                 console.error("Registration failed:", error);
                 let message = '註冊失敗。';
@@ -333,7 +335,6 @@
         async handleLogout() {
             try {
                 await signOut(auth);
-                // AuthStateChange listener handles navigation
             } catch (error) {
                 console.error("Logout failed:", error);
             }
@@ -341,12 +342,10 @@
         
         // --- Time & Date Calculation Logic ---
 
-        // Helper function to format hour/minute string (e.g., 9 -> "09")
         pad(num) {
             return num < 10 ? '0' + num : num;
         },
 
-        // Function to get the full time string (HH:MM) from form inputs
         getDiveTime(prefix) {
             const hourInput = document.getElementById(`${prefix}Hour`);
             const minuteInput = document.getElementById(`${prefix}Minute`);
@@ -371,7 +370,6 @@
                 const end = new Date(`${dateStr}T${exitTimeStr}`);
                 
                 let diffMs = end - start;
-                // Handle cross-midnight dives
                 if (diffMs < 0) {
                     diffMs += 24 * 60 * 60 * 1000;
                 }
@@ -509,10 +507,8 @@
                                 <input type="text" id="location" name="location" required placeholder="如：綠島大白沙" value="${log ? log.location : ''}">
                             </div>
                             
-                            <!-- 修正為 24H 數值輸入 -->
                             ${this.renderTimeInputs('entry', '入水時間', entryTime)}
                             ${this.renderTimeInputs('exit', '出水時間', exitTime)}
-                            <!-- 修正結束 -->
 
                             <div class="md:col-span-2 space-y-1 mt-2">
                                 <label class="block text-sm font-medium text-gray-700">潛水類型</label>
@@ -696,8 +692,22 @@
             const totalSac = validLogs.reduce((sum, l) => sum + l.avg_sac_l_min, 0);
             const avgSac = validLogs.length > 0 ? totalSac / validLogs.length : 0;
             
-            // Sort by date desc
-            const sortedLogs = this.diveLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+            // Sort logs by Date DESC, then Time DESC
+            // [FIX: 2] 確保歷史紀錄按潛水時間先後（最新在前）排列
+            const sortedLogs = this.diveLogs.sort((a, b) => {
+                // 1. Compare Dates
+                const dateA = a.date || '';
+                const dateB = b.date || '';
+                if (dateA !== dateB) {
+                    return dateB.localeCompare(dateA); // Descending
+                }
+                
+                // 2. Compare Times if dates are same
+                const timeA = a.entryTime || '';
+                const timeB = b.entryTime || '';
+                return timeB.localeCompare(timeA); // Descending
+            });
+            
             const totalDives = sortedLogs.length;
 
             const rows = sortedLogs.map((log, index) => {
@@ -735,7 +745,7 @@
                                 <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
                                 <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">日期</th>
                                 <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">潛點</th>
-                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">最大深度/潛水時間</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">深度/時間</th>
                                 <th class="px-3 py-3 text-left text-xs font-bold text-blue-600 uppercase tracking-wider">SAC (L/min)</th>
                                 <th class="px-3 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">操作</th>
                             </tr>
@@ -753,6 +763,9 @@
         },
         
         renderInfoAndGearManager() {
+            // [FIX: 3] 修正裝備管理表單，使其可以支援「修改」功能
+            // 增加隱藏欄位來儲存 editingGearId
+            // 按鈕文字動態變化在 editGear 中處理
             return `
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- 潛水員證照管理 -->
@@ -855,11 +868,18 @@
             const list = this.gearList.map(gear => `
                 <div class="flex justify-between items-center p-3 bg-gray-50 border border-gray-200 rounded-md">
                     <span class="text-gray-800">${gear.name}</span>
-                    <button onclick="app.deleteGear('${gear.id}')" class="text-red-500 hover:text-red-700 text-sm p-1 rounded-full hover:bg-red-100 transition duration-150">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
+                    <div class="flex space-x-2">
+                        <button onclick="app.editGear('${gear.id}')" class="text-blue-500 hover:text-blue-700 text-sm p-1 rounded-full hover:bg-blue-100 transition duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                        </button>
+                        <button onclick="app.deleteGear('${gear.id}')" class="text-red-500 hover:text-red-700 text-sm p-1 rounded-full hover:bg-red-100 transition duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             `).join('');
 
@@ -893,12 +913,10 @@
             const modalContent = document.getElementById('modal-content');
             modalContent.innerHTML = contentHTML;
             modalContainer.classList.remove('hidden');
-            
-            // Attach listeners for forms/buttons inside the modal content
+            // Bind listeners for forms/buttons inside the modal content
             if (this.currentEditingLog) {
                 document.getElementById('edit-log-form').addEventListener('submit', this.handleEditLogSubmit.bind(this));
                 document.getElementById('dive-mode').addEventListener('change', this.toggleNitroxInput);
-                
                 // Re-attach SAC listeners for the modal form
                 ['depth_m', 'avg_depth_m', 'time_min', 'air_start_bar', 'air_end_bar', 'tank_volume_l'].forEach(id => {
                     const input = document.getElementById(id);
@@ -906,10 +924,12 @@
                 });
                 
                 // Add listeners for Time Calculation (for Modal) - UPDATED
-                ['date', 'entryHour', 'entryMinute', 'exitHour', 'exitMinute'].forEach(id => {
-                    const input = document.getElementById(id);
-                    if (input) input.addEventListener('input', this.calculateDiveDuration.bind(this));
-                });
+                const dateInput = document.getElementById('date');
+                const entryTimeInput = document.getElementById('entryTime');
+                const exitTimeInput = document.getElementById('exitTime');
+                if (dateInput) dateInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                if (entryTimeInput) entryTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
+                if (exitTimeInput) exitTimeInput.addEventListener('change', this.calculateDiveDuration.bind(this));
 
                 this.toggleNitroxInput(); // Initial check for edit modal
                 this.calculateAndDisplaySAC(); // Initial SAC calculation for edit modal
@@ -975,15 +995,28 @@
             }
         },
 
-        // --- UPDATED: handleNewLogSubmit to capture custom time inputs ---
+        // --- UPDATED: handleNewLogSubmit to capture new fields ---
         handleNewLogSubmit(event) {
             event.preventDefault();
             const form = event.target;
             const formData = new FormData(form);
 
-            // Get time strings from custom number inputs (guaranteed 24H)
+            const location = formData.get('location');
+            const date = formData.get('date');
+            
+            // FIX: Use helper function to construct time from split inputs
             const entryTime = this.getDiveTime('entry');
             const exitTime = this.getDiveTime('exit');
+
+            // 嚴格驗證：確保日期、時間和地點都不為空
+            // [FIX: 取消欄位檢查提示] 
+            // 雖然 HTML5 有 required 屬性可以阻擋提交，但為了讓使用者更自由地輸入，
+            // 這裡的 JavaScript 檢查被移除。如果需要強制必填，請依賴 HTML required 屬性。
+            /* if (!location || !date || !entryTime || !exitTime) {
+                // alert('請填寫日期、時間和地點等必要資訊。');
+                // return;
+            }
+            */
 
             // Collect Gear Used
             const gearUsed = [];
@@ -999,12 +1032,12 @@
             const sacValue = this.calculateSAC(avgDepthM, timeMin, startBar, endBar, tankVolumeL);
 
             const newLog = {
-                date: formData.get('date'),
-                location: formData.get('location'),
+                date: date,
+                location: location,
                 
-                // Time and Environment Fields (Updated to use 24H string)
-                entryTime: entryTime, 
-                exitTime: exitTime,   
+                // Time and Environment Fields (Updated)
+                entryTime: entryTime, // HH:MM
+                exitTime: exitTime,   // HH:MM
                 diveType: formData.get('diveType'),   // 岸潛 or 船潛
                 waveCondition: formData.get('waveCondition'), // 浪況
                 currentCondition: formData.get('currentCondition'), // 流況
@@ -1040,17 +1073,16 @@
             this.setPage('history');
         },
         
-        // --- UPDATED: handleEditLogSubmit to capture custom time inputs ---
+        // --- UPDATED: handleEditLogSubmit to capture new fields ---
         handleEditLogSubmit(event) {
             event.preventDefault();
             const form = event.target;
             const formData = new FormData(form);
             const logId = this.currentEditingLog.id;
             
-            // Get time strings from custom number inputs (guaranteed 24H)
+            // FIX: Use helper function to construct time from split inputs
             const entryTime = this.getDiveTime('entry');
             const exitTime = this.getDiveTime('exit');
-
 
             const gearUsed = [];
             formData.getAll('gear_used').forEach(item => gearUsed.push(item));
@@ -1067,9 +1099,9 @@
                 date: formData.get('date'),
                 location: formData.get('location'),
                 
-                // Time and Environment Fields (Updated to use 24H string)
-                entryTime: entryTime, 
-                exitTime: exitTime,   
+                // Time and Environment Fields (Updated)
+                entryTime: entryTime, // HH:MM
+                exitTime: exitTime,   // HH:MM
                 diveType: formData.get('diveType'),   // 岸潛 or 船潛
                 waveCondition: formData.get('waveCondition'), // 浪況
                 currentCondition: formData.get('currentCondition'), // 流況
@@ -1169,13 +1201,29 @@
             }
         },
 
-        handleNewGearSubmit(event) {
+        handleGearSubmit(event) {
             event.preventDefault();
             const form = event.target;
             const gearName = document.getElementById('new_gear_name').value.trim();
+            
             if (gearName) {
-                this.addGear({ name: gearName, created_at: new Date().toISOString() });
+                if (this.currentEditingGear) {
+                    // Update existing gear
+                    const updatedGear = { 
+                        name: gearName, 
+                        updated_at: new Date().toISOString() 
+                    };
+                    this.updateGear(this.currentEditingGear.id, updatedGear);
+                } else {
+                    // Add new gear
+                    this.addGear({ name: gearName, created_at: new Date().toISOString() });
+                }
                 form.reset();
+                // Reset editing state
+                this.currentEditingGear = null;
+                // Change button text back to Add
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.textContent = '新增裝備';
             }
         },
 
@@ -1190,6 +1238,17 @@
             }
         },
 
+        async updateGear(gearId, gearData) {
+            const gearRef = this.getCollectionRef('gear');
+            if (!gearRef) return;
+            try {
+                await updateDoc(doc(gearRef, gearId), gearData);
+                console.log('Gear updated successfully');
+            } catch (e) {
+                console.error('Error updating gear: ', e);
+            }
+        },
+
         async deleteGear(gearId) {
             const gearRef = this.getCollectionRef('gear');
             if (!gearRef) return;
@@ -1198,6 +1257,23 @@
                 console.log('Gear deleted successfully');
             } catch (e) {
                 console.error('Error deleting gear: ', e);
+            }
+        },
+
+        editGear(gearId) {
+            const gear = this.gearList.find(g => g.id === gearId);
+            if (!gear) return;
+            
+            this.currentEditingGear = gear;
+            const nameInput = document.getElementById('new_gear_name');
+            const submitBtn = document.querySelector('#new-gear-form button[type="submit"]');
+            
+            if (nameInput) {
+                nameInput.value = gear.name;
+                nameInput.focus();
+            }
+            if (submitBtn) {
+                submitBtn.textContent = '更新裝備';
             }
         },
 
@@ -1211,7 +1287,21 @@
             if (logsRef) {
                 const logsQuery = query(logsRef, orderBy('date', 'desc'));
                 onSnapshot(logsQuery, (snapshot) => {
-                    this.diveLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    let rawLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    
+                    // Sort logs client-side: Date desc, then Time desc
+                    rawLogs.sort((a, b) => {
+                        const dateA = a.date || '';
+                        const dateB = b.date || '';
+                        if (dateA !== dateB) {
+                            return dateB.localeCompare(dateA); // Date descending
+                        }
+                        const timeA = a.entryTime || '';
+                        const timeB = b.entryTime || '';
+                        return timeB.localeCompare(timeA); // Time descending
+                    });
+
+                    this.diveLogs = rawLogs;
                     this.render();
                 }, (error) => console.error("Error listening to logs:", error));
             }
@@ -1244,7 +1334,7 @@
 
             // Re-attach listeners for main app forms
             this.boundLogFormHandler = (e) => { if (e.target.id === 'new-log-form') this.handleNewLogSubmit(e); };
-            this.boundGearFormHandler = (e) => { if (e.target.id === 'new-gear-form') this.handleNewGearSubmit(e); };
+            this.boundGearFormHandler = (e) => { if (e.target.id === 'new-gear-form') this.handleGearSubmit(e); }; // Changed to generic handler
             this.boundCertFormHandler = (e) => { if (e.target.id === 'new-certification-form') this.handleNewCertificationSubmit(e); };
             
             contentContainer.addEventListener('submit', this.boundLogFormHandler);

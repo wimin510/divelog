@@ -466,10 +466,8 @@
             const buttonText = isEdit ? '儲存變更' : '新增紀錄';
             
             const logDate = log ? log.date : new Date().toISOString().substring(0, 10);
-            // Note: log.entryTime / log.exitTime are now stored as "HH:MM" strings
             const entryTime = log ? (log.entryTime || '') : '';
             const exitTime = log ? (log.exitTime || '') : '';
-            
             const diveType = log ? (log.diveType || '岸潛') : '岸潛';
             const waveCondition = log ? (log.waveCondition || '') : '';
             const currentCondition = log ? (log.currentCondition || '') : '';
@@ -698,14 +696,13 @@
             const totalSac = validLogs.reduce((sum, l) => sum + l.avg_sac_l_min, 0);
             const avgSac = validLogs.length > 0 ? totalSac / validLogs.length : 0;
             
-            const totalDives = this.diveLogs.length;
+            // Sort by date desc
+            const sortedLogs = this.diveLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+            const totalDives = sortedLogs.length;
 
-            const rows = this.diveLogs.map((log, index) => {
-                const sacDisplay = log.avg_sac_l_min ? `${log.avg_sac_l_min.toFixed(2)}` : '-';
-                // Newest logs are at the top of the array (index 0)
-                // So dive number should decrease as index increases if we want latest to be highest #?
-                // Or simply total - index.
-                const diveNumber = totalDives - index; 
+            const rows = sortedLogs.map((log, index) => {
+                const sacDisplay = log.avg_sac_l_min ? `${log.avg_sac_l_min.toFixed(2)} L/min` : 'N/A';
+                const diveNumber = totalDives - index; // 倒序編號
 
                 return `
                     <tr class="border-b hover:bg-gray-50 transition duration-150 ease-in-out">
@@ -715,8 +712,12 @@
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">${log.depth_m}m / ${log.time_min}min</td>
                         <td class="px-3 py-3 whitespace-nowrap text-sm text-blue-600 font-medium">${sacDisplay}</td>
                         <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
-                            <button onclick="app.openEditModal('${log.id}')" class="text-indigo-600 hover:text-indigo-900 mx-2 font-semibold">編輯</button>
-                            <button onclick="app.openDeleteModal('${log.id}')" class="text-red-600 hover:text-red-900 mx-2 font-semibold">刪除</button>
+                            <button onclick="app.openEditModal('${log.id}')" class="text-indigo-600 hover:text-indigo-900 mx-1">
+                                編輯
+                            </button>
+                            <button onclick="app.openDeleteModal('${log.id}')" class="text-red-600 hover:text-red-900 mx-1">
+                                刪除
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -858,18 +859,11 @@
             const list = this.gearList.map(gear => `
                 <div class="flex justify-between items-center p-3 bg-gray-50 border border-gray-200 rounded-md">
                     <span class="text-gray-800">${gear.name}</span>
-                    <div class="flex space-x-2">
-                        <button onclick="app.editGear('${gear.id}')" class="text-blue-500 hover:text-blue-700 text-sm p-1 rounded-full hover:bg-blue-100 transition duration-150">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                        </button>
-                        <button onclick="app.deleteGear('${gear.id}')" class="text-red-500 hover:text-red-700 text-sm p-1 rounded-full hover:bg-red-100 transition duration-150">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                    </div>
+                    <button onclick="app.deleteGear('${gear.id}')" class="text-red-500 hover:text-red-700 text-sm p-1 rounded-full hover:bg-red-100 transition duration-150">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
                 </div>
             `).join('');
 
@@ -998,12 +992,6 @@
             const entryTime = this.getDiveTime('entry');
             const exitTime = this.getDiveTime('exit');
 
-            // 嚴格驗證：確保日期、時間和地點都不為空
-            if (!location || !date || !entryTime || !exitTime) {
-                alert('請填寫日期、時間和地點等必要資訊。');
-                return;
-            }
-
             // Collect Gear Used
             const gearUsed = [];
             formData.getAll('gear_used').forEach(item => gearUsed.push(item));
@@ -1054,10 +1042,8 @@
 
             this.addLog(newLog);
             form.reset();
-            // 重置表單後，手動恢復預設值
             document.getElementById('o2_percent').value = '21';
             document.getElementById('tank_volume_l').value = '12.0';
-            // 重要：重置目前頁面狀態，防止意外的重複提交或狀態殘留
             this.setPage('history');
         },
         
@@ -1193,25 +1179,9 @@
             event.preventDefault();
             const form = event.target;
             const gearName = document.getElementById('new_gear_name').value.trim();
-            
             if (gearName) {
-                if (this.currentEditingGear) {
-                    // Update existing gear
-                    const updatedGear = { 
-                        name: gearName, 
-                        updated_at: new Date().toISOString() 
-                    };
-                    this.updateGear(this.currentEditingGear.id, updatedGear);
-                } else {
-                    // Add new gear
-                    this.addGear({ name: gearName, created_at: new Date().toISOString() });
-                }
+                this.addGear({ name: gearName, created_at: new Date().toISOString() });
                 form.reset();
-                // Reset editing state
-                this.currentEditingGear = null;
-                // Change button text back to Add
-                const submitBtn = form.querySelector('button[type="submit"]');
-                if (submitBtn) submitBtn.textContent = '新增裝備';
             }
         },
 
@@ -1226,17 +1196,6 @@
             }
         },
 
-        async updateGear(gearId, gearData) {
-            const gearRef = this.getCollectionRef('gear');
-            if (!gearRef) return;
-            try {
-                await updateDoc(doc(gearRef, gearId), gearData);
-                console.log('Gear updated successfully');
-            } catch (e) {
-                console.error('Error updating gear: ', e);
-            }
-        },
-
         async deleteGear(gearId) {
             const gearRef = this.getCollectionRef('gear');
             if (!gearRef) return;
@@ -1248,23 +1207,6 @@
             }
         },
 
-        editGear(gearId) {
-            const gear = this.gearList.find(g => g.id === gearId);
-            if (!gear) return;
-            
-            this.currentEditingGear = gear;
-            const nameInput = document.getElementById('new_gear_name');
-            const submitBtn = document.querySelector('#new-gear-form button[type="submit"]');
-            
-            if (nameInput) {
-                nameInput.value = gear.name;
-                nameInput.focus();
-            }
-            if (submitBtn) {
-                submitBtn.textContent = '更新裝備';
-            }
-        },
-
         // --- Initialization and Listeners ---
 
         setupListeners() {
@@ -1273,23 +1215,9 @@
             // 1. Logs Listener
             const logsRef = this.getCollectionRef('logs');
             if (logsRef) {
-                const logsQuery = query(logsRef); // Client-side sorting is robust
+                const logsQuery = query(logsRef, orderBy('date', 'desc'));
                 onSnapshot(logsQuery, (snapshot) => {
-                    let rawLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    
-                    // Sort logs client-side: Date desc, then Time desc
-                    rawLogs.sort((a, b) => {
-                        const dateA = a.date || '';
-                        const dateB = b.date || '';
-                        if (dateA !== dateB) {
-                            return dateB.localeCompare(dateA); // Date descending
-                        }
-                        const timeA = a.entryTime || '';
-                        const timeB = b.entryTime || '';
-                        return timeB.localeCompare(timeA); // Time descending
-                    });
-
-                    this.diveLogs = rawLogs;
+                    this.diveLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     this.render();
                 }, (error) => console.error("Error listening to logs:", error));
             }

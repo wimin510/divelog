@@ -549,19 +549,19 @@
                             </div>
                             <div class="space-y-1 relative">
                                 <label for="tank_volume_l" class="block text-sm font-medium text-gray-700">氣瓶容積</label>
-                                <input type="number" id="tank_volume_l" name="tank_volume_l" required placeholder="12.0" step="0.1" min="1" value="${tank_volume_l}">
+                                <input type="number" id="tank_volume_l" name="tank_volume_l" required placeholder="11.1" step="0.1" min="1" value="${tank_volume_l}">
                                 <span class="metric-unit">L</span>
                             </div>
                         </div>
 
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                             <div class="space-y-1 relative">
-                                <label for="air_start_bar" class="block text-sm font-medium text-gray-700">起始壓力</label>
+                                <label for="air_start_bar" class="block text-sm font-medium text-gray-700">起始殘壓</label>
                                 <input type="number" id="air_start_bar" name="air_start_bar" required placeholder="200" min="0" value="${log ? log.air_start_bar : ''}">
                                 <span class="metric-unit">bar</span>
                             </div>
                             <div class="space-y-1 relative">
-                                <label for="air_end_bar" class="block text-sm font-medium text-gray-700">結束壓力</label>
+                                <label for="air_end_bar" class="block text-sm font-medium text-gray-700">結束殘壓</label>
                                 <input type="number" id="air_end_bar" name="air_end_bar" required placeholder="50" min="0" value="${log ? log.air_end_bar : ''}">
                                 <span class="metric-unit">bar</span>
                             </div>
@@ -747,7 +747,7 @@
                                 <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">潛點</th>
                                 <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">深度/時間</th>
                                 <th class="px-3 py-3 text-left text-xs font-bold text-blue-600 uppercase tracking-wider">SAC (L/min)</th>
-                                <th class="px-3 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">操作</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">操作</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
